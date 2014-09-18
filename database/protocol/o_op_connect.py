@@ -25,4 +25,5 @@ class OOperationConnect(OOperation):
     if self.__request_profile == None:
       profile_parser = OProfileParser()
       self.__request_profile = profile_parser.parse(self.__request_profile_str)
+
     return self.__request_profile

@@ -1,5 +1,7 @@
+import asyncore
 from database.o_db_connection import OConnection
-from database.o_db_constants import ODBType
+from database.o_db_constants import ODBType, OModeChar
+from database.protocol.o_op_request import OSQLCommand
 from database.protocol.o_ops import OClient
 
 __author__ = 'daill'
@@ -35,17 +37,22 @@ def do():
     # data = db_exist(connection, "GratefulDeadConcerts", OStorageTypes.PLOCAL)
     # print(data)
     print(o_db_client.connect(connection, user_name="root", user_password="root"))
-    print(o_db_client.db_open(connection, database_name="GratefulDeadConcerts", database_type=ODBType.DOCUMENT, user_name="root", user_password="root"))
-    print(o_db_client.db_size(connection))
-    print(o_db_client.db_countrecords(connection))
-    content = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Barack",surname:"Obama",location:#3:2,invitedBy:,salary_cloned:,salary:120.3f'
-    print(o_db_client.record_load(connection, cluster_id=9, cluster_position=2, fetch_plan="", ignore_cache=1, load_tombstones=' '))
+    print(o_db_client.db_open(connection, database_name="GratefulDeadConcerts", database_type=ODBType.DOCUMENT.value, user_name="root", user_password="root"))
+    # print(o_db_client.db_size(connection))
+    # print(o_db_client.db_countrecords(connection))
+    # content = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Barack",surname:"Obama",location:#3:2,invitedBy:,salary_cloned:,salary:120.3f'
+    # print(o_db_client.record_create(connection, mode=OModeInt.SYNCHRONOUS.value, record_content=content, record_type=ORecordType.DOCUMENT.value))
+    # print(o_db_client.record_load(connection, cluster_id=13, cluster_position=11, fetch_plan="", ignore_cache=1, load_tombstones=' '))
+    # print(o_db_client.record_delete(connection, cluster_id=13, cluster_position=11, record_version=2, mode=OModeInt.SYNCHRONOUS.value))
+    command = OSQLCommand("select * from V", non_text_limit=-1, fetchplan="*:0", serialized_params="")
+    print(o_db_client.command(connection, mode=OModeChar.SYNCHRONOUS, class_name="q", command_payload=command))
     o_db_client.db_close(connection)
 
 
 
 def string_bytes(string):
   print(len(string))
+
 
 
 if __name__ == "__main__":

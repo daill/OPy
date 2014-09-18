@@ -66,7 +66,7 @@ class OOperationError(OOperation):
 
           # check if the first element is again available
           condition = OCondition(operator.__eq__, first_element.value)
-          rest, value = unpack_data(first_element.type, rest, condition)
+          rest, value = unpack_data(first_element.type, rest, condition, name=element.name)
 
           # if the next static byte is 1 again we have to proceed, otherwise return
           if condition.valid() == False:
@@ -75,7 +75,7 @@ class OOperationError(OOperation):
         data_dict = main_dict
       else:
         # parse the data
-        rest, value = unpack_data(element.type, rest)
+        rest, value = unpack_data(element.type, rest, name=element.name)
 
         if element.type != OTypes.BYTE_STATIC.value:
           # put the value into the dict

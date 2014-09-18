@@ -194,41 +194,39 @@ class OOperationDBOpen(OOperation):
 
     def process_element(element: OElement):
       nonlocal rest
+      nonlocal data_dict
+      nonlocal num_cluster
 
       if isinstance(element, OGroup):
-        nonlocal data_dict
-        nonlocal num_cluster
 
         # save main state
         main_dict = data_dict
 
-        main_dict[element.get_name()] = list()
+        main_dict[element.name] = list()
 
         while (num_cluster > 0):
           data_dict = {}
           for sub_element in element.get_elements():
             rest = process_element(sub_element)
           num_cluster -= 1
-          main_dict[element.get_name()].append(data_dict)
+          main_dict[element.name].append(data_dict)
 
         data_dict = main_dict
       else:
         # handling of a term
-        rest, value = unpack_data(element.type, rest)
+        rest, value = unpack_data(element.type, rest, name=element.name)
 
         if element.name == "num-of-clusters":
           # save value as indicator how often the following group will be repeated
-          nonlocal num_cluster
           num_cluster = value
 
         # check if its and error
-        if element.name == OConst.SUCCESS_STATUS and value == 1:
+        if element.name == OConst.SUCCESS_STATUS.value and value == 1:
           logging.error("received an error from the server. start handling")
           nonlocal error_state
           error_state = True
           return
 
-        nonlocal data_dict
         data_dict[element.name] = value
       return rest
 
@@ -290,41 +288,40 @@ class OOperationDBReload(OOperation):
 
     def process_element(element: OElement):
       nonlocal rest
+      nonlocal num_cluster
+      nonlocal data_dict
 
       if isinstance(element, OGroup):
-        nonlocal data_dict
         nonlocal num_cluster
 
         # save main state
         main_dict = data_dict
 
-        main_dict[element.get_name()] = list()
+        main_dict[element.name] = list()
 
         while (num_cluster > 0):
           data_dict = {}
           for sub_element in element.get_elements():
             rest = process_element(sub_element)
           num_cluster -= 1
-          main_dict[element.get_name()].append(data_dict)
+          main_dict[element.name].append(data_dict)
 
         data_dict = main_dict
       else:
         # handling of a term
-        rest, value = unpack_data(element.type, rest)
+        rest, value = unpack_data(element.type, rest, name=element.name)
 
         if element.name == "num-of-clusters":
           # save value as indicator how often the following group will be repeated
-          nonlocal num_cluster
           num_cluster = value
 
         # check if its and error
-        if element.name == OConst.SUCCESS_STATUS and value == 1:
+        if element.name == OConst.SUCCESS_STATUS.value and value == 1:
           logging.error("received an error from the server. start handling")
           nonlocal error_state
           error_state = True
           return
 
-        nonlocal data_dict
         data_dict[element.name] = value
       return rest
 
