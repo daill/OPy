@@ -455,3 +455,157 @@ class OOperationRequestCommand(OOperation):
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
+
+class OOperationRequestTXCommit(OOperation):
+    def __init__(self, entries_profile:str):
+        super().__init__(OOperationType.REQUEST_TX_COMMIT)
+
+        self.__entries_profile = entries_profile
+
+        self.__request_profile_str = "(tx-id:int)(using-tx-log:byte)"
+        self.__response_profile_str = "(created-record-count:int)[{record-created}(client-specified-cluster-id:short)(client-specified-cluster-position:long)(created-cluster-id:short)(created-cluster-position:long)]*(updated-record-count:int)[{record-updated}(updated-cluster-id:short)(updated-cluster-position:long)(new-record-version:int)]*(count-of-collection-changes:int)[{records-canged}(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)(updated-page-index:long)(updated-page-offset:int)]*"
+
+        self.__request_profile = None
+        self.__response_profile = None
+
+    def get_response_profile(self):
+        if self.__response_profile is None:
+            profile_parser = OProfileParser()
+            self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+
+        return self.__response_profile
+
+    def get_request_profile(self):
+        """
+        This method needs to handle the profile in a special way because of alternating entry profiles
+        :return:
+        """
+        if self.__request_profile is None:
+            profile_parser = OProfileParser()
+            profile_to_parse = self.__request_profile_str
+
+            for entry_profile in self.__entries_profile:
+                profile_to_parse += "[{entry}(begin:byte)" + entry_profile + "]"
+
+            profile_to_parse += "(end:byte)(remote-index-length:string)"
+            self.__request_profile_str = profile_to_parse
+            self.__request_profile = profile_parser.parse(self.__request_profile_str)
+
+        return self.__request_profile
+
+    def decode(self, unpack_data, data):
+        """
+        Need to override because of the dependencies of term and group
+
+        :param unpack_data:
+        :param data:
+        :return:
+        """
+        data_dict = {}
+        error_state = False
+        rest = data
+        num_repeats = 0
+
+        def process_element(element: OElement):
+            nonlocal rest
+
+            if isinstance(element, OGroup):
+                nonlocal data_dict
+                nonlocal num_repeats
+
+                # save main state
+                main_dict = data_dict
+
+                main_dict[element.name] = list()
+
+                while (num_repeats > 0):
+                    data_dict = {}
+                    for sub_element in element.get_elements():
+                        rest = process_element(sub_element)
+                    num_repeats -= 1
+                    main_dict[element.name].append(data_dict)
+
+                data_dict = main_dict
+            else:
+                # handling of a term
+                rest, value = unpack_data(element.type, rest, name=element.name)
+
+                if element.name == "created-record-count" or element.name == "updated-record-count" or element.name == "count-of-collection-changes":
+                    num_repeats = value
+
+                # check if its and error
+                if element.name == OConst.SUCCESS_STATUS.value and value == 1:
+                    logging.error("received an error from the server. start handling")
+                    nonlocal error_state
+                    error_state = True
+                    return
+
+                nonlocal data_dict
+                data_dict[element.name] = value
+            return rest
+
+        def process_profile(elements):
+            """
+            Iterate of the whole set of profile elements and unpack them
+            :param elements:
+            :return:
+            """
+            for element in elements:
+                # fetch an error if it occurs
+                nonlocal error_state
+                if error_state:
+                    return OConst.ERROR
+
+                process_element(element)
+
+            return OConst.OK
+
+
+        status = process_profile(self.get_response_profile().get_elements())
+
+        # return the status (OK|Error) to decide what to do next and the extracted data
+        return data_dict, status
+
+
+    def encode(self, pack_data, arguments):
+        def process_element(element: OElement):
+            nonlocal arguments
+
+            if isinstance(element, OGroup):
+                _result = b''
+                temp_arguments = arguments
+
+                if 'entries' not in arguments:
+                    raise ProfileNotMatchException("argument {} could not be found in argument data".format('entries'))
+
+                arguments = arguments['entries'].pop(0)
+
+                for _element in element.get_elements():
+                    _result += process_element(_element)
+
+                arguments = temp_arguments
+
+                return _result
+            else:
+                if element.name in arguments:
+                    _result = b''
+                    if element.is_repeating:
+                        for arg_data in arguments[element.name]:
+                            _result += pack_data(element.type, arg_data, name=element.name)
+                    else:
+                        _result += pack_data(element.type, arguments[element.name], name=element.name)
+                    return _result
+                else:
+                    raise ProfileNotMatchException("argument {} could not be found in argument data".format(element.name))
+
+        def process_profile(elements):
+            result = b''
+            for element in elements:
+                result += process_element(element)
+
+            return result
+
+        if self.get_request_profile() is not None:
+            return process_profile(self.get_request_profile().get_elements())
+
+        return b''

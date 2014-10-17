@@ -118,3 +118,7 @@ class ORecordKind(Enum):
     RID = -3
     RECORD = 0
 
+class OTXOperationType(Enum):
+    UPDATES = 1
+    DELETE = 2
+    CREATIONS = 3

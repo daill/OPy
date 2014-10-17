@@ -1,7 +1,8 @@
-import asyncore
+import random
+import uuid
 from database.o_db_connection import OConnection
-from database.o_db_constants import ODBType, OModeChar
-from database.protocol.o_op_request import OSQLCommand
+from database.o_db_constants import ODBType, OModeChar, ORecordType
+from database.o_db_models import OTXOperationCreate, OTXOperationDelete
 from database.protocol.o_ops import OClient
 
 __author__ = 'daill'
@@ -40,12 +41,18 @@ def do():
     print(o_db_client.db_open(connection, database_name="GratefulDeadConcerts", database_type=ODBType.DOCUMENT.value, user_name="root", user_password="root"))
     # print(o_db_client.db_size(connection))
     # print(o_db_client.db_countrecords(connection))
-    # content = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Barack",surname:"Obama",location:#3:2,invitedBy:,salary_cloned:,salary:120.3f'
+    content1 = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Barack",surname:"Obama",location:#3:2,invitedBy:,salary_cloned:,salary:120.3f'
+    content2 = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Angela",surname:"Merkel",location:#3:2,invitedBy:,salary_cloned:,salary:192.0f'
     # print(o_db_client.record_create(connection, mode=OModeInt.SYNCHRONOUS.value, record_content=content, record_type=ORecordType.DOCUMENT.value))
     # print(o_db_client.record_load(connection, cluster_id=13, cluster_position=11, fetch_plan="", ignore_cache=1, load_tombstones=' '))
     # print(o_db_client.record_delete(connection, cluster_id=13, cluster_position=11, record_version=2, mode=OModeInt.SYNCHRONOUS.value))
-    command = OSQLCommand("select * from V", non_text_limit=-1, fetchplan="*:0", serialized_params="")
-    print(o_db_client.command(connection, mode=OModeChar.SYNCHRONOUS, class_name="q", command_payload=command))
+    #command = OSQLCommand("select * from V", non_text_limit=-1, fetchplan="*:0", serialized_params="")
+    #print(o_db_client.command(connection, mode=OModeChar.SYNCHRONOUS, class_name="q", command_payload=command))
+    create1 = OTXOperationCreate(record_type=ORecordType.DOCUMENT.value, record_content=content1, record_id=-2)
+    create2 = OTXOperationCreate(record_type=ORecordType.DOCUMENT.value, record_content=content2, record_id=-3)
+    # delete = OTXOperationDelete(record_type=ORecordType.DOCUMENT.value, cluster_id=13, cluster_position=14, version=2)
+    print(o_db_client.tx_commit(connection, random.randint(1,1000), 0, [create1, create2]))
+
     o_db_client.db_close(connection)
 
 

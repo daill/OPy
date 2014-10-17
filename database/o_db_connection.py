@@ -176,7 +176,7 @@ class OConnection(object):
 
         while True:
             try:
-                # initially wait 1 second, after there has been some byte read, we can decrease the timeout
+                # initially wait max 1 second, after there has been some byte read, we can decrease the timeout
                 read,write,excpt = select.select([self.__sock],[],[], timeout)
 
                 if self.__sock in read:
@@ -186,6 +186,8 @@ class OConnection(object):
 
                     if buffer:
                         data += buffer
+                    else:
+                        break
 
                     timeout = self.__short_timeout
 
@@ -240,6 +242,14 @@ class OConnection(object):
             return parsed_data
 
         return None
+
+    def send_bytes(self, bytes):
+        """
+        Use this method i.e. to cancel a runnig transaction
+        :param bytes: data to send
+        """
+        if self.__sock is not None:
+            self.__sock.sendall(bytes)
 
 
     def get_request_head(self, operation_type):

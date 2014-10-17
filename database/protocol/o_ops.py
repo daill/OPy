@@ -9,7 +9,7 @@ from database.protocol.o_op_db import OOperationDBClose, OOperationDBCreate, OOp
 from database.protocol.o_op_record import OOperationRecordCreate, OOperationRecordLoad, OOperationRecordUpdate, \
     OOperationRecordDelete
 from database.protocol.o_op_request import OOperationRequestConfigGet, OOperationRequestConfigList, \
-    OOperationRequestConfigSet, OOperationRequestCommand, OSQLPayload
+    OOperationRequestConfigSet, OOperationRequestCommand, OSQLPayload, OOperationRequestTXCommit
 
 
 __author__ = 'daill'
@@ -466,4 +466,42 @@ class OClient:
 
             return response
         except Exception as err:
+            logging.error(err)
+
+    def tx_commit(self, connection:OConnection, tx_id:int, using_tx_log:bytes, entries:list):
+        """
+        Send a bunch of different action to the database to process them in a transaction.
+
+        :param connection:
+        :param tx_id:
+        :param using_tx_log:
+        :param entries:
+        :return:
+        """
+        try:
+            entries_profile = list()
+            entries_data = list()
+            for entry in entries:
+                entries_profile.append(entry.get_profile())
+                entries_data.append(entry.get_data())
+
+            operation = OOperationRequestTXCommit(entries_profile)
+
+            # prepare data dict
+            request_data = {"tx-id": tx_id,
+                            "using-tx-log": using_tx_log,
+                            "entries": entries_data,
+                            "remote-index-length": '',
+                            "end": 0}
+
+
+            logging.debug("called {} with data {}".format(operation, request_data))
+
+            response = connection.exec(operation, request_data)
+
+            return response
+        except Exception as err:
+            # in case of an error terminate the tx
+            connection.send_bytes(b'-1')
+
             logging.error(err)
