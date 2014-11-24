@@ -1,15 +1,13 @@
-import asyncore
-from errno import EAGAIN
 import socket
 import logging
 import struct
 import sys
 import time
-import errno
 import select
-from database.o_db_exceptions import NotConnectedException, WrongTypeException
 
-from database.o_db_constants import OTypes, OConst, ODriver
+from common.o_db_exceptions import NotConnectedException, WrongTypeException
+
+from database.o_db_constants import OTypes, OConst
 from database.o_db_profile_parser import OCondition
 from database.protocol.o_op import OOperation
 from database.protocol.o_op_connect import OOperationConnect
@@ -24,7 +22,7 @@ __author__ = 'daill'
 class OProfileEncoder(object):
     def encode(self, operation: OOperation, arguments: dict):
 
-        def pack_data(type, value, name=" "):
+        def packdata(type, value, name=" "):
             logging.debug("packing '{}' with type {}".format(name, type))
 
             if type == OTypes.BOOLEAN.value:
@@ -71,13 +69,13 @@ class OProfileEncoder(object):
 
                 pass
 
-        return operation.encode(pack_data, arguments)
+        return operation.encode(packdata, arguments)
 
 
 class OProfileDecoder(object):
     def decode(self, operation: OOperation, data: bytes):
 
-        def unpack_data(type, data, condition: OCondition=None, name=""):
+        def unpackdata(type, data, condition: OCondition=None, name=""):
             logging.debug("unpacking '{}' with type {}".format(name, type))
 
             if type == OTypes.BOOLEAN.value:
@@ -108,7 +106,10 @@ class OProfileDecoder(object):
             elif type == OTypes.BYTES.value:
                 int_length = 4
                 count, _data = struct.unpack('>i', data[:int_length])[0], data[int_length:]
-                value, _data = struct.unpack('>{}s'.format(count), _data[:count])[0], _data[count:]
+                if count > 0:
+                    value, _data = struct.unpack('>{}s'.format(count), _data[:count])[0], _data[count:]
+                else:
+                    value = 0
                 return _data, value
             elif type == OTypes.STRING.value:
                 int_length = 4
@@ -131,12 +132,12 @@ class OProfileDecoder(object):
 
                 return _data, value
 
-        data_dict, status = operation.decode(unpack_data, data)
+        data_dict, status = operation.decode(unpackdata, data)
 
         # handle error
         if status == OConst.ERROR and not isinstance(operation, OOperationError):
             error_operation = OOperationError()
-            data_dict, status = error_operation.decode(unpack_data, data)
+            data_dict, status = error_operation.decode(unpackdata, data)
             logging.debug("error data: %s", data_dict)
             raise NotConnectedException("connection not established", data_dict)
 
@@ -144,7 +145,7 @@ class OProfileDecoder(object):
 
 
 class OConnection(object):
-    def __init__(self, user, password, host:str='localhost', port:int=2424):
+    def __init__(self, host:str='0.0.0.0', port:int=2424):
         self.__host = host
         self.__port = port
 
@@ -163,6 +164,9 @@ class OConnection(object):
 
 
         self.open()
+
+    def isopen(self):
+        return self.__sock is not None
 
     def receive(self):
         data = bytes()
@@ -227,15 +231,15 @@ class OConnection(object):
             logging.error("execution of {} failed".format(operation.__class__))
             raise NotConnectedException("the socket connection it not open")
 
-        request_bytes = self.get_request_head(operation.get_operation_type())
-        request_bytes += self.parse_request(operation, data)
+        request_bytes = self.getrequesthead(operation.getoperationtype())
+        request_bytes += self.parserequest(operation, data)
 
         self.__sock.sendall(request_bytes)
 
         if not isinstance(operation, OOperationDBClose):
             data = self.receive()
             logging.debug("read {}".format(data))
-            parsed_data = self.parse_response(operation, data)
+            parsed_data = self.parseresponse(operation, data)
             if isinstance(operation, OOperationConnect) or isinstance(operation, OOperationDBOpen):
                 self.__session_id = parsed_data["session-id"]
                 logging.debug("session id {} saved".format(self.__session_id))
@@ -243,7 +247,7 @@ class OConnection(object):
 
         return None
 
-    def send_bytes(self, bytes):
+    def sendbytes(self, bytes):
         """
         Use this method i.e. to cancel a runnig transaction
         :param bytes: data to send
@@ -252,7 +256,7 @@ class OConnection(object):
             self.__sock.sendall(bytes)
 
 
-    def get_request_head(self, operation_type):
+    def getrequesthead(self, operation_type):
         """
         Prepares the head of the request, consisting of operation type and session id
         :return:
@@ -264,19 +268,18 @@ class OConnection(object):
 
         return head;
 
-    def get_session_id(self):
+    def getsessionid(self):
         return self.__session_id
 
-    def get_protocol_version(self):
+    def getprotocolversion(self):
         return self.__protocol_version
 
-    def parse_request(self, operation: OOperation, data: dict):
+    def parserequest(self, operation: OOperation, data: dict):
         logging.debug("parse request for {} operation".format(operation.__class__))
         parser = OProfileEncoder()
         return parser.encode(operation, data)
 
-
-    def parse_response(self, operation: OOperation, data):
+    def parseresponse(self, operation: OOperation, data):
         logging.debug("parse response for {} operation".format(operation.__class__))
 
         parser = OProfileDecoder()
@@ -292,17 +295,20 @@ class OConnection(object):
 
     def open(self):
         try:
-            logging.debug("opening connection")
-            self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.__sock.connect((self.__host, self.__port))
-            self.__sock.setblocking(0)
+            if self.__sock is None:
+                logging.debug("opening connection")
+                self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.__sock.connect((self.__host, self.__port))
+                self.__sock.setblocking(0)
 
-            operation_init = OOperationInit()
-            data = self.receive()
-            result = self.parse_response(operation_init, data)
+                operation_init = OOperationInit()
+                data = self.receive()
+                result = self.parseresponse(operation_init, data)
 
-            self.__protocol_version = result['protocol_number']
-            logging.info("working with protocol version {}".format(self.__protocol_version))
+                self.__protocol_version = result['protocol_number']
+                logging.info("working with protocol version {}".format(self.__protocol_version))
+            else:
+                logging.debug("connection already opened")
             logging.debug("connection opened")
         except socket.error as msg:
             logging.error('Error code: ' + str(msg[0]) + ' , Error message : ' + msg[1])

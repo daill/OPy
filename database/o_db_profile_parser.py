@@ -85,10 +85,10 @@ class OGroup(OElement):
         self.__member = list()
         self.name = ''
 
-    def add_element(self, element: OElement):
+    def addelement(self, element: OElement):
         self.__member.append(element)
 
-    def get_elements(self):
+    def getelements(self):
         return self.__member
 
 
@@ -98,10 +98,10 @@ class OProfile(object):
         self.__elements = list()
         self.__element_index = 0
 
-    def add_element(self, element: OElement):
+    def addelement(self, element: OElement):
         self.__elements.append(element)
 
-    def get_elements(self):
+    def getelements(self):
         return self.__elements
 
 
@@ -128,12 +128,12 @@ class OProfileParser(object):
         if profile_str != None:
             self.__profile_str = profile_str
             # do it twice to ensure that current_token isnt none
-            self.read_token()
-            self.read_token()
+            self.readtoken()
+            self.readtoken()
 
-            return self.parse_profile()
+            return self.parseprofile()
 
-    def parse_profile(self):
+    def parseprofile(self):
         profile = OProfile()
 
         while True:
@@ -141,59 +141,59 @@ class OProfileParser(object):
                 return profile
             elif self.__current_token == OControl.LEFT_PARANTHESES:
                 # parse term
-                element = self.parse_term()
+                element = self.parseterm()
             elif self.__current_token == OControl.GROUP_LEFT:
                 # parse group
-                element = self.parse_group()
+                element = self.parsegroup()
 
             if element:
-                profile.add_element(element)
+                profile.addelement(element)
 
 
-    def parse_term(self):
-        self.read_token()
+    def parseterm(self):
+        self.readtoken()
         if self.__current_token == OControl.RIGHT_PARANTHESES:
             element = OTerm(self.__current_text)
             self.__current_text = ''
 
             if self.__lookahead_token == OControl.MULTI or self.__lookahead_token == OControl.OPTIONAL:
                 element.is_repeating = True
-                self.read_token()
+                self.readtoken()
 
-            self.read_token()
+            self.readtoken()
             return element
         else:
             return None
 
-    def parse_group(self):
+    def parsegroup(self):
         """
         Parses a group of elements indicated by [.
         :return:
         """
-        self.read_token()
+        self.readtoken()
         element = OGroup()
         while self.__current_token != OControl.GROUP_RIGHT:
             if self.__current_token == OControl.GROUP_LEFT:
-                element.add_element(self.parse_group())
+                element.addelement(self.parsegroup())
             elif self.__current_token == OControl.LEFT_PARANTHESES:
-                element.add_element(self.parse_term())
+                element.addelement(self.parseterm())
             elif self.__current_token == OControl.GROUP_NAME_RIGHT:
                 element.name = self.__current_text
                 self.__current_text = ''
-                self.read_token()
+                self.readtoken()
             else:
-                self.read_token()
+                self.readtoken()
 
         if self.__lookahead_token == OControl.MULTI or self.__lookahead_token == OControl.OPTIONAL:
             element.is_repeating = True
-            self.read_token()
+            self.readtoken()
 
-        self.read_token()
+        self.readtoken()
         return element
 
     # reads the next token either ( ) [ ] * + or just text
-    def read_token(self):
-        currentchar = self.next_char()
+    def readtoken(self):
+        currentchar = self.nextchar()
         self.__current_token = self.__lookahead_token
 
         while True:
@@ -228,10 +228,10 @@ class OProfileParser(object):
                 self.__lookahead_token = OControl.TEXT
                 self.__current_text += currentchar
 
-            currentchar = self.next_char()
+            currentchar = self.nextchar()
 
     # reads the current char which should be processed
-    def next_char(self):
+    def nextchar(self):
         char = None
         if self.__index < len(self.__profile_str):
             char = self.__profile_str[self.__index]

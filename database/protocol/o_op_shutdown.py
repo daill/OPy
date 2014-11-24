@@ -16,9 +16,9 @@ class ORequestShutdown(OOperation):
   def exec(self, connection):
     return super().exec(connection)
 
-  def get_request_profile(self):
-    return super().get_request_profile()
+  def getrequestprofile(self):
+    return super().getrequestprofile()
 
-  def get_response_profile(self):
-    return super().get_response_profile()
+  def getresponseprofile(self):
+    return super().getresponseprofile()
 

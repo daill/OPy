@@ -1,8 +1,11 @@
 import logging
-from database.o_db_constants import OOperationType, OConst, OTypes, ORecordKind
-from database.o_db_exceptions import ProfileNotMatchException
+
+from database.o_db_constants import OOperationType, OConst, OTypes, ORecordKind, ORecordType
+from common.o_db_exceptions import ProfileNotMatchException
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
-from database.protocol.o_op import OOperation, ORecord
+from database.protocol.o_op import OOperation
+from database.protocol.o_op_record import ORecord
+
 
 __author__ = 'daill'
 
@@ -17,7 +20,7 @@ class OOperationRequestConfigGet(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -25,7 +28,7 @@ class OOperationRequestConfigGet(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -42,7 +45,7 @@ class OOperationRequestConfigSet(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -50,7 +53,7 @@ class OOperationRequestConfigSet(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -67,7 +70,7 @@ class OOperationRequestConfigList(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -75,7 +78,7 @@ class OOperationRequestConfigList(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -94,12 +97,10 @@ class OOperationRequestConfigList(OOperation):
         rest = data
         num_cfg_items = 0
 
-        def process_element(element: OElement):
-            nonlocal rest
+        def processelement(element: OElement):
+            nonlocal rest, num_cfg_items, data_dict
 
             if isinstance(element, OGroup):
-                nonlocal data_dict
-                nonlocal num_cfg_items
 
                 # save main state
                 main_dict = data_dict
@@ -108,8 +109,8 @@ class OOperationRequestConfigList(OOperation):
 
                 while (num_cfg_items > 0):
                     data_dict = {}
-                    for sub_element in element.get_elements():
-                        rest = process_element(sub_element)
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
                     num_cfg_items -= 1
                     main_dict[element.name].append(data_dict)
 
@@ -120,7 +121,6 @@ class OOperationRequestConfigList(OOperation):
 
                 if element.name == "num-cfg-items":
                     # save value as indicator how often the following group will be repeated
-                    nonlocal num_cfg_items
                     num_cfg_items = value
 
                 # check if its and error
@@ -130,11 +130,10 @@ class OOperationRequestConfigList(OOperation):
                     error_state = True
                     return
 
-                nonlocal data_dict
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -146,12 +145,12 @@ class OOperationRequestConfigList(OOperation):
                 if error_state:
                     return OConst.ERROR
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
@@ -163,10 +162,10 @@ class OSQLPayload(object):
     def __init__(self):
         self.__data_dict = dict()
 
-    def get_data(self):
+    def getdata(self):
         return self.__data_dict
 
-    def get_profile_str(self):
+    def getprofilestr(self):
         return self.__sql_profile_str
 
 class OSQLCommand(OSQLPayload):
@@ -221,8 +220,8 @@ class OOperationRequestCommand(OOperation):
         super().__init__(OOperationType.REQUEST_COMMAND)
 
         self.__request_profile_str = "(mode:byte)(command-payload-length:int)(class-name:string)"
-        self.__response_profile_str_sync = "[(synch-result-type:byte)[{records}(pre-fetched-record-size:byte)(synch-result-content:record)]]+"
-        self.__response_profile_str_async = "[(asynch-result-type:byte)[(asynch-result-content:record)]*](pre-fetched-record-size.md)[(pre-fetched-record)]*+"
+        self.__response_profile_str_sync = "[{result}(synch-result-type:byte)[{records}(synch-result-content:record)]]+"
+        self.__response_profile_str_async = "[{result}(asynch-result-type:byte)[{records}(asynch-result-content:record)]*](pre-fetched-record-size.md)[(pre-fetched-record)]*+"
 
         self.__request_profile = None
         self.__response_profile = None
@@ -232,10 +231,10 @@ class OOperationRequestCommand(OOperation):
 
         self.__command_payload = command_payload
 
-    def set_async(self, async:bool):
+    def setasync(self, async:bool):
         self.__async = async
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             if self.__async:
@@ -244,10 +243,10 @@ class OOperationRequestCommand(OOperation):
                 self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str_sync)
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
-            self.__request_profile = profile_parser.parse(self.__request_profile_str + self.__command_payload.get_profile_str())
+            self.__request_profile = profile_parser.parse(self.__request_profile_str + self.__command_payload.getprofilestr())
         return self.__request_profile
 
 
@@ -261,12 +260,12 @@ class OOperationRequestCommand(OOperation):
         """
         command_payload_length_name = "command-payload-length"
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             if element.name == command_payload_length_name:
                 return b''
 
             if isinstance(element, OGroup):
-                return process_element(element)
+                return processelement(element)
             else:
                 if element.name in arguments:
                     _result = b''
@@ -280,7 +279,7 @@ class OOperationRequestCommand(OOperation):
                     raise ProfileNotMatchException(
                         "argument {} could not be found in argument data".format(element.name))
 
-        def process_profile(elements):
+        def processprofile(elements):
             result = b''
             process_counter = 0
             orig_result = None
@@ -292,7 +291,7 @@ class OOperationRequestCommand(OOperation):
                     result = b''
                     continue
                 else:
-                    result += process_element(element)
+                    result += processelement(element)
 
                 process_counter += 1
 
@@ -303,8 +302,8 @@ class OOperationRequestCommand(OOperation):
 
             return result
 
-        if self.get_request_profile() is not None:
-            return process_profile(self.get_request_profile().get_elements())
+        if self.getrequestprofile() is not None:
+            return processprofile(self.getrequestprofile().getelements())
 
         return b''
 
@@ -321,7 +320,7 @@ class OOperationRequestCommand(OOperation):
         error_state = False
         synch_result_type = None
 
-        def parse_record(main_dict:dict, rest:bytes, name:str):
+        def parserecord(main_dict:dict, rest:bytes, name:str):
             """
             Reads a record by its definition
 
@@ -333,14 +332,14 @@ class OOperationRequestCommand(OOperation):
             nonlocal data_dict
             data_dict = {}
             rest, value = unpack_data(OTypes.SHORT.value, rest, name="record-kind")
-            elements = ORecord(ORecordKind(value)).get_response_profile().get_elements()
+            elements = ORecord(ORecordKind(value)).getresponseprofile().getelements()
             # parse each record
             for sub_element in elements:
-                rest = process_element(sub_element, rest)
+                rest = processelement(sub_element, rest)
             main_dict[name].append(data_dict)
             return rest
 
-        def process_element(element: OElement, rest:bytes):
+        def processelement(element: OElement, rest:bytes):
             """
             Parses the bytes base on the element definition
 
@@ -368,33 +367,36 @@ class OOperationRequestCommand(OOperation):
                     elif synch_result_type == 'r':
                         logging.debug("parsing single record command response")
                         # single record
-                        rest = parse_record(main_dict, rest, element.name)
+                        rest = parserecord(main_dict, rest, element.name)
                     elif synch_result_type == 'l':
                         logging.debug("parsing record list command response")
                         # list of records
                         rest, count = unpack_data(OTypes.INT.value, rest, name="count")
 
                         for i in range(count):
-                            rest = parse_record(main_dict, rest, element.name)
+                            rest = parserecord(main_dict, rest, element.name)
 
                     elif synch_result_type == 'a':
                         logging.debug("parsing serialized records command response")
+
+                        rest, type = unpack_data(OTypes.STRING.value, rest, name="type")
+
                         # serialized result
                         # TODO implement
                         pass
                     elif self.__protocol_version > 17:
                         logging.debug("using new version of command response parsing")
-                        status, rest = unpack_data(OTypes.BYTE.value, rest, name="status")
+                        rest, status = unpack_data(OTypes.BYTE.value, rest, name="status")
                         while status > 0:
-                            rest = parse_record(main_dict, rest, element.name)
-                            status, rest = unpack_data(OTypes.BYTE.value, rest, name="status")
+                            rest = parserecord(main_dict, rest, element.name)
+                            rest, status = unpack_data(OTypes.BYTE.value, rest, name="status")
                 else:
                     while True:
                         if len(rest) <= 1:
                             break
                         data_dict = {}
-                        for sub_element in element.get_elements():
-                            rest = process_element(sub_element, rest)
+                        for sub_element in element.getelements():
+                            rest = processelement(sub_element, rest)
                         main_dict[element.name].append(data_dict)
 
                 data_dict = main_dict
@@ -417,7 +419,7 @@ class OOperationRequestCommand(OOperation):
                     main_dict = data_dict
                     data_dict = {}
 
-                    process_profile(record.get_response_profile())
+                    processprofile(record.getresponseprofile())
 
                     main_dict[element.get_name()].append(data_dict)
                     data_dict = main_dict
@@ -434,7 +436,7 @@ class OOperationRequestCommand(OOperation):
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements, data:bytes):
+        def processprofile(elements, data:bytes):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -446,15 +448,57 @@ class OOperationRequestCommand(OOperation):
                 if error_state:
                     return OConst.ERROR
 
-                data = process_element(element, data)
+                data = processelement(element, data)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements(), data)
+        status = processprofile(self.getresponseprofile().getelements(), data)
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
+
+class OTXEntry:
+    """
+    Base class for all possible tx operations like CREATE, DELETE and UPDATE
+    """
+    def __init__(self, operation_type:bytes, record_type:ORecordType, cluster_id:int, cluster_position:int):
+        self._request_base_profile = "(operation-type:byte)(cluster-id:short)(cluster-position:long)(record-type:byte)"
+        self._request_profile = None
+        self._data = {"operation-type": operation_type,
+                      "cluster-id": cluster_id,
+                      "cluster-position": cluster_position,
+                      "begin": 1,
+                      "record-type": record_type}
+
+    def getdata(self):
+        return self._data
+
+    def getprofile(self):
+        return self._request_profile
+
+class OTXOperationCreate(OTXEntry):
+    """
+    For temporary RID's in transactions we have to use -1 as clusterid and <-1 for clusterposition
+    """
+    def __init__(self, record_type:ORecordType, record_content:bytes, record_id:int):
+        super().__init__(3, record_type, -1, record_id)
+        self._request_profile = self._request_base_profile + "(record-content:bytes)"
+        self._data.update({"record-content": record_content})
+
+class OTXOperationUpdate(OTXEntry):
+    def __init__(self, record_type:ORecordType, cluster_id:int, cluster_position:int, version:int, content_changed:bool, record_content:bytes):
+        super().__init__(1, record_type, cluster_id, cluster_position)
+        self._request_profile = self._request_base_profile + "(version:int)(record-content:bytes)"
+        self._data.update({"version": version,
+                           "content-changed": content_changed,
+                           "record-content": record_content})
+
+class OTXOperationDelete(OTXEntry):
+    def __init__(self, record_type:ORecordType, cluster_id:int, cluster_position:int, version:int):
+        super().__init__(2, record_type, cluster_id, cluster_position)
+        self._request_profile = self._request_base_profile + "(version:int)"
+        self._data.update({"version": version})
 
 class OOperationRequestTXCommit(OOperation):
     def __init__(self, entries_profile:str):
@@ -468,14 +512,14 @@ class OOperationRequestTXCommit(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         """
         This method needs to handle the profile in a special way because of alternating entry profiles
         :return:
@@ -506,11 +550,10 @@ class OOperationRequestTXCommit(OOperation):
         rest = data
         num_repeats = 0
 
-        def process_element(element: OElement):
-            nonlocal rest
+        def processelement(element: OElement):
+            nonlocal rest, data_dict
 
             if isinstance(element, OGroup):
-                nonlocal data_dict
                 nonlocal num_repeats
 
                 # save main state
@@ -520,8 +563,8 @@ class OOperationRequestTXCommit(OOperation):
 
                 while (num_repeats > 0):
                     data_dict = {}
-                    for sub_element in element.get_elements():
-                        rest = process_element(sub_element)
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
                     num_repeats -= 1
                     main_dict[element.name].append(data_dict)
 
@@ -540,11 +583,10 @@ class OOperationRequestTXCommit(OOperation):
                     error_state = True
                     return
 
-                nonlocal data_dict
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -556,19 +598,19 @@ class OOperationRequestTXCommit(OOperation):
                 if error_state:
                     return OConst.ERROR
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
 
 
     def encode(self, pack_data, arguments):
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             nonlocal arguments
 
             if isinstance(element, OGroup):
@@ -580,8 +622,8 @@ class OOperationRequestTXCommit(OOperation):
 
                 arguments = arguments['entries'].pop(0)
 
-                for _element in element.get_elements():
-                    _result += process_element(_element)
+                for _element in element.getelements():
+                    _result += processelement(_element)
 
                 arguments = temp_arguments
 
@@ -598,14 +640,14 @@ class OOperationRequestTXCommit(OOperation):
                 else:
                     raise ProfileNotMatchException("argument {} could not be found in argument data".format(element.name))
 
-        def process_profile(elements):
+        def processprofile(elements):
             result = b''
             for element in elements:
-                result += process_element(element)
+                result += processelement(element)
 
             return result
 
-        if self.get_request_profile() is not None:
-            return process_profile(self.get_request_profile().get_elements())
+        if self.getrequestprofile() is not None:
+            return processprofile(self.getrequestprofile().getelements())
 
         return b''

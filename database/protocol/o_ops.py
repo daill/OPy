@@ -1,7 +1,8 @@
 import logging
 
 from database.o_db_connection import OConnection
-from database.o_db_constants import OStorageTypes, ODBType, ODriver, OModeInt, ORecordType, OModeChar
+from database.o_db_constants import OStorageTypes, ODBType, ODriver, OModeInt, ORecordType, OModeChar, OCommandClass, \
+    OSerialization
 from database.protocol.o_op_connect import OOperationConnect
 from database.protocol.o_op_db import OOperationDBClose, OOperationDBCreate, OOperationDBExist, OOperationDBList, \
     OOperationDBOpen, OOperationDBReload, \
@@ -15,8 +16,14 @@ from database.protocol.o_op_request import OOperationRequestConfigGet, OOperatio
 __author__ = 'daill'
 
 
-class OClient:
-    def db_reload(self, connection:OConnection):
+class ODB:
+    """
+    This is the interface to the orient db
+    """
+    def __init__(self):
+        pass
+
+    def dbreload(self, connection:OConnection):
         """
         Reloads database information. Response is the clusternames and ids
 
@@ -35,7 +42,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_create(self, connection:OConnection, database_name:str, database_type:ODBType, storage_type:OStorageTypes):
+    def dbcreate(self, connection:OConnection, database_name:str, database_type:ODBType, storage_type:OStorageTypes):
         """
         Creates a new database.
         This operation is only working when the server_connect function has been run preivously.
@@ -76,9 +83,10 @@ class OClient:
             # create data for initial connect
             data = {"driver-name": ODriver.DRIVER_NAME.value,
                     "driver-version": ODriver.DRIVER_VERSION.value,
-                    "protocol-version": connection.get_protocol_version(),
+                    "protocol-version": connection.getprotocolversion(),
                     "client-id": '-1',
                     "user-name": user_name,
+                    "serialization-impl": OSerialization.SERIALIZATION_CSV.value,
                     "user-password": user_password}
 
             result_data = connection.exec(operation_connect, data)
@@ -87,7 +95,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_open(self, connection:OConnection, database_name:str, database_type:ODBType, user_name:str,
+    def dbopen(self, connection:OConnection, database_name:str, database_type:ODBType, user_name:str,
                 user_password:str):
         """
         Opens the connection to a db.
@@ -103,11 +111,12 @@ class OClient:
             # create data for initial connect
             request_data = {"driver-name": ODriver.DRIVER_NAME.value,
                             "driver-version": ODriver.DRIVER_VERSION.value,
-                            "protocol-version": connection.get_protocol_version(),
+                            "protocol-version": connection.getprotocolversion(),
                             "client-id": "",
                             "user-name": user_name,
                             "user-password": user_password,
                             "database-name": database_name,
+                            "serialization-impl": OSerialization.SERIALIZATION_CSV.value,
                             "database-type": database_type}
 
             operation = OOperationDBOpen()
@@ -120,7 +129,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_close(self, connection:OConnection):
+    def dbclose(self, connection:OConnection):
         """
         Closes the connection to the database and lets the server close the socket
 
@@ -141,7 +150,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def config_set(self, connection:OConnection, key:str, value:str):
+    def configset(self, connection:OConnection, key:str, value:str):
         """
         Sets a configuration value
 
@@ -165,9 +174,9 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_list(self, connection:OConnection):
+    def dblist(self, connection:OConnection):
         """
-        Gets the size of the database
+        Retrieves a list of databases from the server
 
         :param connection:
         :return:
@@ -183,7 +192,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def config_list(self, connection:OConnection):
+    def configlist(self, connection:OConnection):
         """
         Get a configuration value from the server.
 
@@ -202,7 +211,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def config_get(self, connection:OConnection, key:str):
+    def configget(self, connection:OConnection, key:str):
         """
         Get a configuration value from the server.
 
@@ -224,7 +233,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_countrecords(self, connection:OConnection):
+    def dbcountrecords(self, connection:OConnection):
         """
         Gets the size of the database
 
@@ -242,7 +251,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_size(self, connection:OConnection):
+    def dbsize(self, connection:OConnection):
         """
         Gets the size of the database
 
@@ -260,26 +269,9 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_list(self, connection:OConnection):
-        """
-        Retrieves a list of databases from the server
-
-        :param connection:
-        :return:
-        """
-        try:
-            operation = OOperationDBList()
-
-            logging.debug("called {}".format(operation))
-
-            response = connection.exec(operation, {})
-
-            return response
-        except Exception as err:
-            logging.error(err)
 
 
-    def record_update(self, connection:OConnection, cluster_id:int, cluster_position:int, update_content:bool, record_content:bytes, record_version:int, record_type:ORecordType, mode:OModeInt):
+    def recordupdate(self, connection:OConnection, cluster_id:int, cluster_position:int, update_content:bool, record_content:bytes, record_version:int, record_type:ORecordType, mode:OModeInt):
         """
         Tries to update a record
 
@@ -313,7 +305,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def record_delete(self, connection:OConnection, cluster_id:int, cluster_position:int, record_version:int, mode:OModeInt):
+    def recorddelete(self, connection:OConnection, cluster_id:int, cluster_position:int, record_version:int, mode:OModeInt):
         """
         Deletes a record, return True if deleted and False if not or not existing record
 
@@ -345,7 +337,7 @@ class OClient:
             logging.error(err)
 
 
-    def record_load(self, connection:OConnection, cluster_id:int, cluster_position:int, fetch_plan:str, ignore_cache:bytes, load_tombstones:bytes):
+    def recordload(self, connection:OConnection, cluster_id:int, cluster_position:int, fetch_plan:str, ignore_cache:bytes, load_tombstones:bytes):
         """
         Loads a records from the database
 
@@ -375,7 +367,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def record_create(self, connection:OConnection, record_content:bytes, record_type:ORecordType, mode:OModeInt):
+    def recordcreate(self, connection:OConnection, record_content:bytes, record_type:ORecordType, mode:OModeInt):
         """
         Creates a record
 
@@ -390,8 +382,8 @@ class OClient:
             request_data = {"datasegment-id": -1,
                             "cluster-id": -1,
                             "record-content": record_content,
-                            "record-type": record_type,
-                            "mode": mode}
+                            "record-type": record_type.value,
+                            "mode": mode.value}
 
             operation = OOperationRecordCreate()
 
@@ -403,7 +395,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def db_exist(self, connection:OConnection, database_name:str, server_storage_type:OStorageTypes):
+    def dbexist(self, connection:OConnection, database_name:str, server_storage_type:OStorageTypes):
         """
         If the database exists it return True otherwise False.
         This operation is only working when the server_connect function has been run preivously.
@@ -431,7 +423,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def command(self, connection:OConnection, mode:OModeChar, class_name:str, command_payload):
+    def command(self, connection:OConnection, mode:OModeChar, class_name:OCommandClass, command_payload):
         """
         Sends a command to the server. There a different modes to tell the server what kind of command has just been sent:
         'q' => idempotent command i.e. SELECT
@@ -449,16 +441,16 @@ class OClient:
         try:
             # prepare data dict
             request_data = {"mode": mode.value,
-                            "class-name": class_name}
+                            "class-name": class_name.value}
 
 
             if isinstance(command_payload, OSQLPayload):
-                request_data.update(command_payload.get_data())
+                request_data.update(command_payload.getdata())
 
-            operation = OOperationRequestCommand(command_payload, connection.get_protocol_version())
+            operation = OOperationRequestCommand(command_payload, connection.getprotocolversion())
 
             if mode == OModeInt.ASYNCHRONOUS:
-                operation.set_async(True)
+                operation.setasync(True)
 
             logging.debug("called {} with data {}".format(operation, request_data))
 
@@ -468,7 +460,7 @@ class OClient:
         except Exception as err:
             logging.error(err)
 
-    def tx_commit(self, connection:OConnection, tx_id:int, using_tx_log:bytes, entries:list):
+    def txcommit(self, connection:OConnection, tx_id:int, using_tx_log:bytes, entries:list):
         """
         Send a bunch of different action to the database to process them in a transaction.
 
@@ -482,8 +474,8 @@ class OClient:
             entries_profile = list()
             entries_data = list()
             for entry in entries:
-                entries_profile.append(entry.get_profile())
-                entries_data.append(entry.get_data())
+                entries_profile.append(entry.getprofile())
+                entries_data.append(entry.getdata())
 
             operation = OOperationRequestTXCommit(entries_profile)
 
@@ -502,6 +494,6 @@ class OClient:
             return response
         except Exception as err:
             # in case of an error terminate the tx
-            connection.send_bytes(b'-1')
+            connection.sendbytes(b'-1')
 
             logging.error(err)

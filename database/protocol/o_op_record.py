@@ -1,9 +1,40 @@
 import logging
-from database.o_db_constants import OOperationType, OConst
+from database.o_db_constants import OOperationType, OConst, ORecordKind
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
 
 __author__ = 'daill'
+
+class ORecord(object):
+    """
+    This class represents a record.
+
+    -3 for RID
+    -2 for null record
+    Everything else for a record
+    """
+    def __init__(self, kind:ORecordKind):
+        self.__kind = kind
+
+        self.__rid_profile_str = "(cluster-id:short)(cluster-position:long)"
+        self.__record_profile_str = "(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)"
+        self.__record_profile = None
+        self.__rid_profile = None
+
+    def getresponseprofile(self):
+        profile_parser = OProfileParser()
+
+        if self.__kind == ORecordKind.NULL:
+            # do nothing return empty profile
+            return profile_parser.parse("")
+        elif self.__kind == ORecordKind.RID:
+            if self.__rid_profile is None:
+                self.__rid_profile = profile_parser.parse(self.__rid_profile_str)
+            return self.__rid_profile
+        else:
+            if self.__record_profile is None:
+                self.__record_profile = profile_parser.parse(self.__record_profile_str)
+            return self.__record_profile
 
 
 class OOperationRecordUpdate(OOperation):
@@ -16,14 +47,14 @@ class OOperationRecordUpdate(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -42,7 +73,7 @@ class OOperationRecordUpdate(OOperation):
         rest = data
         count_of_collection_changes = 0
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             nonlocal rest
 
             if isinstance(element, OGroup):
@@ -56,8 +87,8 @@ class OOperationRecordUpdate(OOperation):
 
                 while (count_of_collection_changes > 0):
                     data_dict = {}
-                    for sub_element in element.get_elements():
-                        rest = process_element(sub_element)
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
                     count_of_collection_changes -= 1
                     main_dict[element.name].append(data_dict)
 
@@ -82,7 +113,7 @@ class OOperationRecordUpdate(OOperation):
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -94,12 +125,12 @@ class OOperationRecordUpdate(OOperation):
                 if error_state:
                     return OConst.ERROR
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
@@ -114,7 +145,7 @@ class OOperationRecordDelete(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -122,7 +153,7 @@ class OOperationRecordDelete(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -132,13 +163,15 @@ class OOperationRecordCreate(OOperation):
     def __init__(self):
         super().__init__(OOperationType.REQUEST_RECORD_CREATE)
 
-        self.__request_profile_str = "(datasegment-id:int)(cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)"
+        # datasegment id removed since 2.0
+        # self.__request_profile_str = "(datasegment-id:int)(cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)"
+        self.__request_profile_str = "(cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)"
         self.__response_profile_str = "(cluster-position:long)(record-version:int)(count-of-collection-changes:int)[{update-info}(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)(updated-page-index:long)(updated-page-offset:int)]"
 
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -146,7 +179,7 @@ class OOperationRecordCreate(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -165,7 +198,7 @@ class OOperationRecordCreate(OOperation):
         rest = data
         count_of_collection_changes = 0
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             nonlocal rest
 
             if isinstance(element, OGroup):
@@ -179,8 +212,8 @@ class OOperationRecordCreate(OOperation):
 
                 while (count_of_collection_changes > 0):
                     data_dict = {}
-                    for sub_element in element.get_elements():
-                        rest = process_element(sub_element)
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
                     count_of_collection_changes -= 1
                     main_dict[element.name].append(data_dict)
 
@@ -205,7 +238,7 @@ class OOperationRecordCreate(OOperation):
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -217,12 +250,12 @@ class OOperationRecordCreate(OOperation):
                 if error_state:
                     return OConst.ERROR
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
@@ -238,7 +271,7 @@ class OOperationRecordLoad(OOperation):
         self.__request_profile = None
         self.__response_profile = None
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
@@ -246,7 +279,7 @@ class OOperationRecordLoad(OOperation):
 
         return self.__response_profile
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         if self.__request_profile is None:
             profile_parser = OProfileParser()
             self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -264,7 +297,7 @@ class OOperationRecordLoad(OOperation):
         error_state = False
         rest = data
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             nonlocal rest
 
             if isinstance(element, OGroup):
@@ -278,8 +311,8 @@ class OOperationRecordLoad(OOperation):
                 while element.is_repeating:
                     data_dict = {}
 
-                    for sub_element in element.get_elements():
-                        rest = process_element(sub_element)
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
 
                     main_dict[element.name].append(data_dict)
                     break
@@ -305,7 +338,7 @@ class OOperationRecordLoad(OOperation):
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -317,12 +350,12 @@ class OOperationRecordLoad(OOperation):
                 if error_state:
                     return OConst.ERROR.value
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status

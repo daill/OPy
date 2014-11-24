@@ -122,3 +122,13 @@ class OTXOperationType(Enum):
     UPDATES = 1
     DELETE = 2
     CREATIONS = 3
+
+class OCommandClass(Enum):
+    IDEMPOTENT = 'q'
+    NON_IDEMPOTENT = 'c'
+    SCRIPT = 's'
+
+class OPlainClass(Enum):
+    VERTEX = 'V'
+    EDGE = 'E'
+

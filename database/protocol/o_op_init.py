@@ -15,14 +15,14 @@ class OOperationInit(OOperation):
     self.__request_profile = None
     self.__response_profile = None
 
-  def get_response_profile(self):
+  def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
       self.__response_profile = profile_parser.parse(self.__response_profile_str)
 
     return self.__response_profile
 
-  def get_request_profile(self):
+  def getrequestprofile(self):
     if self.__request_profile is None:
       profile_parser = OProfileParser()
       self.__request_profile = profile_parser.parse(self.__request_profile_str)

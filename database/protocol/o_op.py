@@ -1,43 +1,16 @@
 import logging
-from database.o_db_exceptions import ProfileNotMatchException
-from database.o_db_constants import OConst, OOperationType, ORecordKind
-from database.o_db_profile_parser import OElement, OGroup, OProfileParser
+
+from common.o_db_exceptions import ProfileNotMatchException
+from database.o_db_constants import OConst, OOperationType
+from database.o_db_profile_parser import OElement, OGroup
+
 
 __author__ = 'daill'
 
-class ORecord(object):
-    """
-    This class represents a record.
-
-    -3 for RID
-    -2 for null record
-    Everything else for a record
-    """
-    def __init__(self, kind:ORecordKind):
-        self.__kind = kind
-
-        self.__rid_profile_str = "(cluster-id:short)(cluster-position:long)"
-        self.__record_profile_str = "(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)"
-        self.__record_profile = None
-        self.__rid_profile = None
-
-    def get_response_profile(self):
-        profile_parser = OProfileParser()
-
-        if self.__kind == ORecordKind.NULL:
-            # do nothing return empty profile
-            return profile_parser.parse("")
-        elif self.__kind == ORecordKind.RID:
-            if self.__rid_profile is None:
-                self.__rid_profile = profile_parser.parse(self.__rid_profile_str)
-            return self.__rid_profile
-        else:
-            if self.__record_profile is None:
-                self.__record_profile = profile_parser.parse(self.__record_profile_str)
-            return self.__record_profile
-
-
 class OOperation(object):
+    """
+    Base class which has to be derived by all other commands
+    """
     def __init__(self, operation_type:OOperationType):
         self.__operation_type = operation_type
         self.__response_head = "(success_status:byte)(session-id:int)"
@@ -45,13 +18,13 @@ class OOperation(object):
     def exec(self, connection):
         raise NotImplementedError("You have to implement the exec method")
 
-    def get_operation_type(self):
+    def getoperationtype(self):
         return self.__operation_type.value
 
-    def get_request_profile(self):
+    def getrequestprofile(self):
         raise NotImplementedError("You have to implement a method to return the built request profile")
 
-    def get_response_profile(self):
+    def getresponseprofile(self):
         raise NotImplementedError("You have to implement a method to return the built response profile")
 
     def decode(self, unpack_data, data):
@@ -67,13 +40,13 @@ class OOperation(object):
         error_state = False
         rest = data
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             nonlocal rest
 
             if isinstance(element, OGroup):
                 # standard handling of group with non repeating elements
-                for sub_element in element.get_elements():
-                    rest = process_element(sub_element)
+                for sub_element in element.getelements():
+                    rest = processelement(sub_element)
             else:
                 # handling of a term
                 # check if there are bytes left
@@ -93,7 +66,7 @@ class OOperation(object):
                 data_dict[element.name] = value
             return rest
 
-        def process_profile(elements):
+        def processprofile(elements):
             """
             Iterate of the whole set of profile elements and unpack them
             :param elements:
@@ -105,21 +78,21 @@ class OOperation(object):
                 if error_state:
                     return OConst.ERROR
 
-                process_element(element)
+                processelement(element)
 
             return OConst.OK
 
 
-        status = process_profile(self.get_response_profile().get_elements())
+        status = processprofile(self.getresponseprofile().getelements())
 
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
 
     def encode(self, pack_data, arguments):
 
-        def process_element(element: OElement):
+        def processelement(element: OElement):
             if isinstance(element, OGroup):
-                return process_element(element)
+                return processelement(element)
             else:
                 if element.name in arguments:
                     _result = b''
@@ -133,14 +106,14 @@ class OOperation(object):
                     raise ProfileNotMatchException(
                         "argument {} could not be found in argument data".format(element.name))
 
-        def process_profile(elements):
+        def processprofile(elements):
             result = b''
             for element in elements:
-                result += process_element(element)
+                result += processelement(element)
 
             return result
 
-        if self.get_request_profile() is not None:
-            return process_profile(self.get_request_profile().get_elements())
+        if self.getrequestprofile() is not None:
+            return processprofile(self.getrequestprofile().getelements())
 
         return b''

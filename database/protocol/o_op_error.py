@@ -16,14 +16,14 @@ class OOperationError(OOperation):
     self.__request_profile = None
     self.__response_profile = None
 
-  def get_response_profile(self):
+  def getresponseprofile(self):
     if self.__response_profile == None:
       profile_parser = OProfileParser()
       self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
 
     return self.__response_profile
 
-  def get_request_profile(self):
+  def getrequestprofile(self):
     if self.__request_profile == None:
       profile_parser = OProfileParser()
       self.__request_profile = profile_parser.parse(self.__request_profile_str)
@@ -41,7 +41,7 @@ class OOperationError(OOperation):
     data_dict = {}
     rest = data
 
-    def process_element(element: OElement):
+    def processelement(element: OElement):
       nonlocal rest
 
       if isinstance(element, OGroup):
@@ -55,14 +55,14 @@ class OOperationError(OOperation):
           main_dict[OConst.EXCEPTION].append(data_dict)
           # need the first element to test if its repeating
           # in case of an error its the static byte 1
-          first_element = element.get_elements()[0]
+          first_element = element.getelements()[0]
 
           # make sure we've a static byte here as first element
           assert first_element.type == OTypes.BYTE_STATIC.value
 
           # process the elements of this group
-          for sub_element in element.get_elements():
-            rest = process_element(sub_element)
+          for sub_element in element.getelements():
+            rest = processelement(sub_element)
 
           # check if the first element is again available
           condition = OCondition(operator.__eq__, first_element.value)
@@ -83,14 +83,14 @@ class OOperationError(OOperation):
           data_dict[element.name] = value
       return rest
 
-    def process_profile(elements):
+    def processprofile(elements):
       for element in elements:
 
-        process_element(element)
+        processelement(element)
 
       return OConst.OK
 
-    status = process_profile(self.get_response_profile().get_elements())
+    status = processprofile(self.getresponseprofile().getelements())
 
     return data_dict, status
 
