@@ -8,8 +8,8 @@ class OOperationConnect(OOperation):
   def __init__(self):
     super().__init__(OOperationType.REQUEST_CONNECT)
 
-    self.__request_profile_str = "(driver-name:string)(driver-version:string)(protocol-version:short)(client-id:string)(serialization-impl:string)(user-name:string)(user-password:string)"
-    self.__response_profile_str = "(session-id:int)"
+    self.__request_profile_str = "(driver-name:string)(driver-version:string)(protocol-version:short)(client-id:string)(serialization-impl:string)(token-session:boolean)(user-name:string)(user-password:string)"
+    self.__response_profile_str = "(session-id:int)(token:bytes)"
 
     self.__request_profile = None
     self.__response_profile = None
@@ -17,7 +17,7 @@ class OOperationConnect(OOperation):
   def getresponseprofile(self):
     if self.__response_profile == None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 

@@ -36,7 +36,6 @@ class ORecord(object):
                 self.__record_profile = profile_parser.parse(self.__record_profile_str)
             return self.__record_profile
 
-
 class OOperationRecordUpdate(OOperation):
     def __init__(self):
         super().__init__(OOperationType.REQUEST_RECORD_UPDATE)
@@ -50,7 +49,7 @@ class OOperationRecordUpdate(OOperation):
     def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
-            self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+            self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -149,7 +148,7 @@ class OOperationRecordDelete(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -175,7 +174,7 @@ class OOperationRecordCreate(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -275,7 +274,7 @@ class OOperationRecordLoad(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 

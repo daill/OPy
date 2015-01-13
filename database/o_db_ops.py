@@ -86,7 +86,8 @@ class ODB:
                     "protocol-version": connection.getprotocolversion(),
                     "client-id": '-1',
                     "user-name": user_name,
-                    "serialization-impl": OSerialization.SERIALIZATION_CSV.value,
+                    "token-session": 1,
+                    "serialization-impl": OSerialization.SERIALIZATION_BINARY.value,
                     "user-password": user_password}
 
             result_data = connection.exec(operation_connect, data)
@@ -115,8 +116,9 @@ class ODB:
                             "client-id": "",
                             "user-name": user_name,
                             "user-password": user_password,
+                            "token-session": 1,
                             "database-name": database_name,
-                            "serialization-impl": OSerialization.SERIALIZATION_CSV.value,
+                            "serialization-impl": OSerialization.SERIALIZATION_BINARY.value,
                             "database-type": database_type}
 
             operation = OOperationDBOpen()

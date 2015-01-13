@@ -14,6 +14,15 @@ class OOperation(object):
     def __init__(self, operation_type:OOperationType):
         self.__operation_type = operation_type
         self.__response_head = "(success_status:byte)(session-id:int)"
+        self.__token = "(token:bytes)"
+        self.token_based = False
+        self.token = None
+
+    def getresponsehead(self):
+        if self.token_based:
+            return "{}{}".format(self.__response_head, self.__token)
+        else:
+            return self.__response_head
 
     def exec(self, connection):
         raise NotImplementedError("You have to implement the exec method")

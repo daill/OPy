@@ -31,7 +31,7 @@ class OOperationDBCountrecords(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -54,7 +54,7 @@ class OOperationDBSize(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -77,7 +77,7 @@ class OOperationDBCreate(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -100,7 +100,7 @@ class OOperationDBDrop(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -123,7 +123,7 @@ class OOperationDBExist(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -146,7 +146,7 @@ class OOperationDBList(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 
@@ -160,8 +160,8 @@ class OOperationDBOpen(OOperation):
   def __init__(self):
     super().__init__(OOperationType.REQUEST_DB_OPEN)
 
-    self.__request_profile_str = "(driver-name:string)(driver-version:string)(protocol-version:short)(client-id:string)(serialization-impl:string)(database-name:string)(database-type:string)(user-name:string)(user-password:string)"
-    self.__response_profile_str = "(session-id:int)(num-of-clusters:short)[{clusters}(cluster-name:string)(cluster-id:short)](cluster-config:bytes)(orientdb-release:string)"
+    self.__request_profile_str = "(driver-name:string)(driver-version:string)(protocol-version:short)(client-id:string)(serialization-impl:string)(token-session:boolean)(database-name:string)(database-type:string)(user-name:string)(user-password:string)"
+    self.__response_profile_str = "(session-id:int)(token:bytes)(num-of-clusters:short)[(cluster-name:string)(cluster-id:short)](cluster-config:bytes)(orientdb-release:string)"
 
     self.__request_profile = None
     self.__response_profile = None
@@ -169,7 +169,7 @@ class OOperationDBOpen(OOperation):
   def getresponseprofile(self):
     if self.__response_profile is None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 

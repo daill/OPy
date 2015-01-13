@@ -19,7 +19,7 @@ class OOperationError(OOperation):
   def getresponseprofile(self):
     if self.__response_profile == None:
       profile_parser = OProfileParser()
-      self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+      self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
     return self.__response_profile
 

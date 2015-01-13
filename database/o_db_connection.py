@@ -7,8 +7,8 @@ import select
 
 from common.o_db_exceptions import NotConnectedException, WrongTypeException
 
-from database.o_db_constants import OTypes, OConst
-from database.o_db_profile_parser import OCondition
+from database.o_db_constants import OTypes, OConst, OOperationType
+from database.o_db_profile_parser import OCondition, OProfileParser
 from database.protocol.o_op import OOperation
 from database.protocol.o_op_connect import OOperationConnect
 from database.protocol.o_op_db import OOperationDBClose, OOperationDBOpen
@@ -23,7 +23,8 @@ class OProfileEncoder(object):
     def encode(self, operation: OOperation, arguments: dict):
 
         def packdata(type, value, name=" "):
-            logging.debug("packing '{}' with type {}".format(name, type))
+            if not 'pass' in name:
+                logging.debug("packing '{}' with type {} and value '{}'".format(name, type, value))
 
             if type == OTypes.BOOLEAN.value:
                 return struct.pack(">b", value)
@@ -152,6 +153,8 @@ class OConnection(object):
         self.__protocol_version = None
         self.__sock = None
         self.__session_id = None
+        self.__token = None
+        self.__token_based = False
 
         self.__buffer_size = 4096
 
@@ -215,7 +218,7 @@ class OConnection(object):
                     if retry_count == 0:
                         break
             except socket.error as e:
-                logging.error(e)
+                logging.error("socket error: " + e)
         end = time.time()
         logging.debug("total runtime {}s".format(end-start))
         return data
@@ -231,6 +234,11 @@ class OConnection(object):
             logging.error("execution of {} failed".format(operation.__class__))
             raise NotConnectedException("the socket connection it not open")
 
+        if isinstance(operation, OOperationConnect):
+            if "token-session" in data and data["token-session"] == 1:
+                self.__token_based = True
+
+
         request_bytes = self.getrequesthead(operation.getoperationtype())
         request_bytes += self.parserequest(operation, data)
 
@@ -243,13 +251,17 @@ class OConnection(object):
             if isinstance(operation, OOperationConnect) or isinstance(operation, OOperationDBOpen):
                 self.__session_id = parsed_data["session-id"]
                 logging.debug("session id {} saved".format(self.__session_id))
+
+                if "token" in parsed_data:
+                    self.__token = parsed_data["token"]
+                    logging.debug("token {} saved".format(self.__token))
             return parsed_data
 
         return None
 
     def sendbytes(self, bytes):
         """
-        Use this method i.e. to cancel a runnig transaction
+        Use this method i.e. to cancel a running transaction
         :param bytes: data to send
         """
         if self.__sock is not None:
@@ -266,7 +278,12 @@ class OConnection(object):
         else:
             head = struct.pack(">b i", operation_type, self.__session_id)
 
-        return head;
+        if self.__token_based:
+            if operation_type != OOperationType.REQUEST_CONNECT.value and operation_type != OOperationType.REQUEST_DB_OPEN.value:
+                length = len(self.__token)
+                head += struct.pack(">i {}s".format(length), length, self.__token)
+
+        return head
 
     def getsessionid(self):
         return self.__session_id
@@ -274,15 +291,25 @@ class OConnection(object):
     def getprotocolversion(self):
         return self.__protocol_version
 
+    def gettoken(self):
+        return self.__token
+
     def parserequest(self, operation: OOperation, data: dict):
         logging.debug("parse request for {} operation".format(operation.__class__))
         parser = OProfileEncoder()
+
         return parser.encode(operation, data)
 
     def parseresponse(self, operation: OOperation, data):
         logging.debug("parse response for {} operation".format(operation.__class__))
 
         parser = OProfileDecoder()
+
+        if isinstance(operation, OOperationConnect) or isinstance(operation, OOperationDBOpen):
+            operation.token_based = False
+        else:
+            operation.token_based = self.__token_based
+
         return parser.decode(operation, data)
 
     def close(self):

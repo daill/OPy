@@ -132,3 +132,8 @@ class OPlainClass(Enum):
     VERTEX = 'V'
     EDGE = 'E'
 
+class ORidBagType(Enum):
+    EMBEEDED = 1
+    TREE = 2
+
+

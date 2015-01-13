@@ -1,6 +1,6 @@
 import logging
 
-from database.o_db_constants import OOperationType, OConst, OTypes, ORecordKind, ORecordType
+from database.o_db_constants import OOperationType, OConst, OTypes, ORecordKind, ORecordType, ORidBagType
 from common.o_db_exceptions import ProfileNotMatchException
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
@@ -24,7 +24,7 @@ class OOperationRequestConfigGet(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -49,7 +49,7 @@ class OOperationRequestConfigSet(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -74,7 +74,7 @@ class OOperationRequestConfigList(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             self.__response_profile = profile_parser.parse(
-                self._OOperation__response_head + self.__response_profile_str)
+                self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -238,9 +238,9 @@ class OOperationRequestCommand(OOperation):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
             if self.__async:
-                self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str_async)
+                self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str_async)
             else:
-                self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str_sync)
+                self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str_sync)
         return self.__response_profile
 
     def getrequestprofile(self):
@@ -297,7 +297,7 @@ class OOperationRequestCommand(OOperation):
 
                 if process_counter == (len(elements)-1):
                     size = len(result)
-                    command_payload_length = pack_data(OTypes.INT.value, size, name=command_payload_length_name)
+                    command_payload_length = pack_data(type=OTypes.INT.value, value=size, name=command_payload_length_name)
                     result = orig_result + command_payload_length + result
 
             return result
@@ -384,12 +384,14 @@ class OOperationRequestCommand(OOperation):
                         # serialized result
                         # TODO implement
                         pass
-                    elif self.__protocol_version > 17:
+
+                    if self.__protocol_version > 17:
                         logging.debug("using new version of command response parsing")
-                        rest, status = unpack_data(OTypes.BYTE.value, rest, name="status")
-                        while status > 0:
-                            rest = parserecord(main_dict, rest, element.name)
+                        while len(rest) > 0:
                             rest, status = unpack_data(OTypes.BYTE.value, rest, name="status")
+                            if status == 2:
+                                rest = parserecord(main_dict, rest, element.name)
+
                 else:
                     while True:
                         if len(rest) <= 1:
@@ -515,7 +517,7 @@ class OOperationRequestTXCommit(OOperation):
     def getresponseprofile(self):
         if self.__response_profile is None:
             profile_parser = OProfileParser()
-            self.__response_profile = profile_parser.parse(self._OOperation__response_head + self.__response_profile_str)
+            self.__response_profile = profile_parser.parse(self.getresponsehead() + self.__response_profile_str)
 
         return self.__response_profile
 
@@ -651,3 +653,124 @@ class OOperationRequestTXCommit(OOperation):
             return processprofile(self.getrequestprofile().getelements())
 
         return b''
+
+class ORidBag(object):
+    """
+    If config
+    Rid format (cluster-id:short)(cluster-position:long)
+    """
+    def __init__(self, type:ORidBagType):
+        self.__config_str = "(config:byte)"
+        # optional uuid
+        self.__temp_uuid = "(most-sig-bits:long)(least-sig-bits:long)"
+        self.__embedded_str = "(size:int)[{links}(cluster-id:short)(cluster-position:long)]*"
+        self.__tree_str = "(fileId:long)(pageIndex:long)(pageOffset:int)(size:int)(changesSize:int)[[{links}(cluster-id:short)(cluster-position:long)](changeType:byte)(value:int)]*"
+
+        self.__temp_uuid_profile = None
+        self.__config_profile = None
+        self.__embedded_profile = None
+        self.__tree_profile = None
+
+        self.__ridbagtype = type
+
+    def getconfigprofile(self):
+        if self.__config_profile is None:
+            profile_parser = OProfileParser()
+            self.__config_profile = profile_parser.parse(self.__config_str)
+
+        return self.__config_profile
+
+    def getuuidprofile(self):
+        if self.__temp_uuid_profile is None:
+            profile_parser = OProfileParser()
+            self.__temp_uuid_profile = profile_parser.parse(self.__temp_uuid)
+
+        return self.__temp_uuid_profile
+
+    def getembeddedprofile(self):
+        if self.__embedded_profile is None:
+            profile_parser = OProfileParser()
+            self.__embedded_profile = profile_parser.parse("{}{}".format(self.__config_str,self.__embedded_str))
+
+        return self.__embedded_profile
+
+    def gettreeprofile(self):
+        if self.__tree_profile is None:
+            profile_parser = OProfileParser()
+            self.__tree_profile = profile_parser.parse(self.__tree_str)
+
+        return self.__tree_profile
+
+    def decode(self, unpack_data, data):
+        """
+        Decodes the embedded variant of a ridbag
+
+        :param unpack_data:
+        :param data:
+        :return:
+        """
+        data_dict = {}
+        rest = data
+        num_repeats = 0
+
+        def processelement(element: OElement):
+            nonlocal rest, data_dict
+
+            if isinstance(element, OGroup):
+                nonlocal num_repeats
+
+                # save main state
+                main_dict = data_dict
+
+                main_dict[element.name] = list()
+
+                while (num_repeats > 0):
+                    data_dict = {}
+                    for sub_element in element.getelements():
+                        rest = processelement(sub_element)
+                    num_repeats -= 1
+                    main_dict[element.name].append(data_dict)
+
+                data_dict = main_dict
+            else:
+                # handling of a term
+                rest, value = unpack_data(element.type, rest, name=element.name)
+                data_dict[element.name] = value
+
+                if element.name == 'size':
+                    num_repeats = value
+            return rest
+
+        def processprofile(elements):
+            """
+            Iterate of the whole set of profile elements and unpack them
+            :param elements:
+            :return:
+            """
+            for element in elements:
+                processelement(element)
+
+            return OConst.OK
+
+        if ORidBagType.EMBEEDED == self.__ridbagtype:
+            status = processprofile(self.getembeddedprofile().getelements())
+        elif ORidBagType.TREE == self.__ridbagtype:
+            status = processprofile(self.gettreeprofile().getelements())
+
+        # return the status (OK|Error) to decide what to do next and the extracted data
+        return data_dict, status
+
+
+class OOPerationRequestRidBagGetSize(OOperation):
+    """
+    collectionPointer = (fileId:long)(pageIndex:long)(pageOffset:int)
+    collectionChanges = (changesSize:int)[(link:rid)(changeType:byte)(value:int)]*
+    """
+    def __init__(self):
+        super().__init__(OOperationType.REQUEST_RIDBAG_GET_SIZE)
+
+        self.__request_profile_str = "(fileId:long)(pageIndex:long)(pageOffset:int)(changesSize:int)[(cluster-id:short)(cluster-position:long)(changeType:byte)(value:int)]*"
+        self.__response_profile_str = "(size:int)"
+
+        self.__request_profile = None
+        self.__response_profile = None
