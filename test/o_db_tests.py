@@ -1,8 +1,10 @@
 import unittest
+
 from database.o_db_connection import OConnection
 from database.o_db_constants import ODBType, OModeChar, OCommandClass, OModeInt, ORecordType
 from database.protocol.o_op_request import OSQLCommand
-from database.protocol.o_ops import ODB
+from database.o_db_ops import ODB
+
 
 __author__ = 'daill'
 
