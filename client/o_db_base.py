@@ -1,16 +1,21 @@
+import logging
+
 __author__ = 'daill'
 
 class BaseEntity(object):
     def __init__(self):
-        pass
+        self.version = None
+        self.clusterposition = None
+        self.clusterid = None
 
-class MetaData(object):
-    def __init__(self):
-        self.version = 0
-        self.position = 0
-        self.cluster = 0
+    def getRID(self):
+        return "#{}:{}".format(self.clusterid, self.clusterposition)
 
-class BaseVertex(BaseEntity, MetaData):
+    def setRID(self, clusterid:int, clusterposition:int):
+        self.clusterid = clusterid
+        self.clusterposition = clusterposition
+
+class BaseVertex(BaseEntity):
     """
     Class which has to be implemented by all class who should be persisted within the orientdb
     Its necessary to use public vars in order to provide access to getter and setter
@@ -18,8 +23,7 @@ class BaseVertex(BaseEntity, MetaData):
     The edges will be organized in a dict where the key denotes the edge name.
     """
     def __init__(self):
-        BaseEntity.__init__(self)
-        MetaData.__init__(self)
+        super().__init__()
         self.in_edges = None
         self.__out_edges = None
 
@@ -45,16 +49,15 @@ class BaseVertex(BaseEntity, MetaData):
     out_edges = property(getoutedges, setoutedges)
 
     def getrid(self):
-        return '#{}:{}'.format(self.cluster, self.position  )
+        return '#{}:{}'.format(self.clusterid, self.clusterposition  )
 
-class BaseEdge(BaseEntity, MetaData):
+class BaseEdge(BaseEntity):
     """
     You can extend this class to provide own attributes
     Every edge must have an incoming and outgoing edge to a vertex.
     Furthermore the can be use defined properties
     """
-    def __init__(self, target:BaseVertex):
-        BaseEntity.__init__(self)
-        MetaData.__init__(self)
+    def __init__(self, target:BaseVertex=None):
+        super().__init__()
         self.in_vertex = None
         self.out_vertex = target

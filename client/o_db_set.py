@@ -41,6 +41,8 @@ class Class(QueryType):
         self.__persistent_class = persistent_class
         self.__class_name = getattr(persistent_class, '__name__')
         self.__class_type = class_type
+        # save module to database to identify on later following selection process
+        self.__class_module = persistent_class.__module__
 
     def parse(self):
         query_string = io.StringIO()
@@ -210,10 +212,12 @@ class Select(QueryType):
         [LOCK default|record]
         [PARALLEL]
     """
-    def __init__(self, clazz:BaseVertex, projections:list=None, *elements:QueryElement):
+    def __init__(self, clazz:BaseEntity, projections:list=None, *elements:QueryElement):
         self.__elements = elements
         self.__query_dict = dict()
+        self.__clazz = clazz
         self.__clazz_name = getattr(clazz,'__name__')
+        self.__prefix = None
         self.__query_rule_index = ["Let", "Where", "GroupBy", "OrderBy", "Skip", "Limit", "Fetchplan", "Timeout", "Lock", "Parallel"]
         self.__projections = projections
 
@@ -226,6 +230,9 @@ class Select(QueryType):
                 query_string.write(" ")
         query_string.write("from ")
         query_string.write(escapeclassname(self.__clazz_name))
+        if self.__prefix:
+            query_string.write(" ")
+            query_string.write(self.__prefix)
 
         for element in self.__elements:
             self.__query_dict[element.__class__.__name__] = str(element)
@@ -289,23 +296,23 @@ class Condition(QueryElement):
         self.__attribute_name = attribute_name
 
     def isle(self, value:object):
-        self._query = "{} <= {}".format(self.__attribute_name, value)
+        self._query = "{} <= '{}'".format(self.__attribute_name, value)
         return self
 
     def islt(self, value:object):
-        self._query = "{} < {}".format(self.__attribute_name, value)
+        self._query = "{} < '{}'".format(self.__attribute_name, value)
         return self
 
     def isge(self, value:object):
-        self._query = "{} >= {}".format(self.__attribute_name, value)
+        self._query = "{} >= '{}'".format(self.__attribute_name, value)
         return self
 
     def isgt(self, value:object):
-        self._query = "{} > {}".format(self.__attribute_name, value)
+        self._query = "{} > '{}'".format(self.__attribute_name, value)
         return self
 
     def iseq(self, value:object):
-        self._query = "{} = {}".format(self.__attribute_name, value)
+        self._query = "{} = '{}'".format(self.__attribute_name, value)
         return self
 
     def isin(self, value:object):
@@ -318,8 +325,10 @@ class Where(QueryElement):
 
     def __str__(self):
         query_string = io.StringIO()
+        query_string.write(" where ")
         for linkage in self.__linkage_elements:
             query_string.write(str(linkage))
+        query_string.write(" ")
         result_string = query_string.getvalue()
         query_string.close()
         return result_string
