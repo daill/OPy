@@ -1,6 +1,20 @@
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from enum import Enum
 import string
-from database.o_db_constants import OTypes
+from database.o_db_constants import OProfileType
 
 __author__ = 'daill'
 
@@ -66,11 +80,11 @@ class OTerm(OElement):
     def __init__(self, profile: str):
         super().__init__(OKind.TERM)
         if not ":" in profile and not string.ascii_letters in profile:
-            self.type = OTypes.BYTE_STATIC.value
+            self.type = OProfileType.BYTE_STATIC
             self.value = profile
             self.name = ''
         else:
-            self.name, self.type = profile.split(":")
+            self.name, self.type = profile.split(":")[0], OProfileType(profile.split(":")[1])
 
 
 class OGroup(OElement):

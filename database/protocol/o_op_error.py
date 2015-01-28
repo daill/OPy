@@ -1,6 +1,20 @@
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import operator
-from database.o_db_constants import OConst, OTypes
+from database.o_db_constants import OConst, OProfileType
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup, OCondition
 from database.protocol.o_op import OOperation
 
@@ -43,9 +57,9 @@ class OOperationError(OOperation):
 
     def processelement(element: OElement):
       nonlocal rest
+      nonlocal data_dict
 
       if isinstance(element, OGroup):
-        nonlocal data_dict
         # save main state
         main_dict = data_dict
         # create new dict
@@ -58,7 +72,7 @@ class OOperationError(OOperation):
           first_element = element.getelements()[0]
 
           # make sure we've a static byte here as first element
-          assert first_element.type == OTypes.BYTE_STATIC.value
+          assert first_element.type == OProfileType.BYTE_STATIC
 
           # process the elements of this group
           for sub_element in element.getelements():
@@ -77,9 +91,8 @@ class OOperationError(OOperation):
         # parse the data
         rest, value = unpack_data(element.type, rest, name=element.name)
 
-        if element.type != OTypes.BYTE_STATIC.value:
+        if element.type != OProfileType.BYTE_STATIC:
           # put the value into the dict
-          nonlocal data_dict
           data_dict[element.name] = value
       return rest
 

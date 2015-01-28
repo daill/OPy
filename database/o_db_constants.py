@@ -1,8 +1,18 @@
-import socket
-import logging
-import struct
-from enum import Enum
-import sys
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from enum import Enum, IntEnum
 
 
 __author__ = 'daill'
@@ -70,12 +80,6 @@ class ODBType(Enum):
     DOCUMENT = "document"
     GRAPH = "graph"
 
-
-class ODriver(Enum):
-    DRIVER_NAME = 'OPy'
-    DRIVER_VERSION = '0.1'
-
-
 class OSerialization(Enum):
     SERIALIZATION_CSV = 'ORecordDocument2csv'
     SERIALIZATION_BINARY = 'ORecordSerializerBinary'
@@ -95,7 +99,7 @@ class OConst(Enum):
     EXCEPTION_CLASS = "exception-class"
 
 
-class OTypes(Enum):
+class OProfileType(Enum):
     BOOLEAN = "boolean"
     BYTE = "byte"
     SHORT = "short"
@@ -105,8 +109,48 @@ class OTypes(Enum):
     STRING = "string"
     RECORD = "record"
     STRINGS = "strings"
+    DATETIME = "datetime" # treated as long
+    BINARY = "binary" # (size:int)(bytes:bytes)
+    EMBEDDED = "embedded" # (serialized_document:bytes)
+    EMBEDDEDLIST = "embeddedlist" # (serialized_document:bytes)[{items}(data_type:byte)(data:data_type)]*
+    EMBEDDEDSET = "embeddedset" # (serialized_document:bytes)[{items}(data_type:byte)(data:data_type)]*
+    EMBEDDEDMAP = "embeddedmap" # [{header}(keyType:byte)(keyValue:keyType)]*[{values}(valueType:byte)(value:valueType)]*
+    LINK = "link" # (cluster:int)(record:int)
+    LINKLIST = "linklist" # (size:int)[{collection}(cluster:int)(record:int)]*
+    LINKSET = "linkset" # (size:int)[{collection}(cluster:int)(record:int)]*
+    LINKMAP = "linkmap" # [{values}(keyType:byte)(keyValue:keyType)(cluster:int)(record:int)]*
+    DECIMAL = "decimal" # (scale:int)(valueSize:int)(value:bytes)
     # special types for special handling
-    BYTE_STATIC = "byte_static"
+    BYTE_STATIC = "byte_static" # used to represent something like (1) or (0)
+    VARINT = "varint"
+    # theres a special type of integer within serialization of records
+    STRING_VARINT = "string-varint"
+
+class OBinaryType(IntEnum):
+    BOOLEAN = 0
+    INTEGER = 1
+    SHORT = 2
+    LONG = 3
+    FLOAT = 4
+    DOUBLE = 5
+    DATETIME = 6
+    STRING = 7
+    BINARY = 8
+    EMBEDDED = 9
+    EMBEDDEDLIST = 10
+    EMBEDDEDSET = 11
+    EMBEDDEDMAP = 12
+    LINK = 13
+    LINKLIST = 14
+    LINKSET = 15
+    LINKMAP = 16
+    BYTE = 17
+    TRANSIENT = 18
+    DATE = 19
+    CUSTOM = 20
+    DECIMAL = 21
+    LINKBAG = 22
+    ANY = 23
 
 class ORecordType(Enum):
     RAW_BYTES = 'b'
@@ -135,5 +179,6 @@ class OPlainClass(Enum):
 class ORidBagType(Enum):
     EMBEEDED = 1
     TREE = 2
+
 
 

@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from test.model.o_db_test_obj import TestObject
+from database.o_db_constants import OSerialization
 
 __author__ = 'daill'
 
-class TestCoordinates(TestObject):
-    def __init__(self, lat, lng):
-        self.lat = lat
-        self.lng = lng
 
-    def persistent_attributes(self):
-        return ['lat', 'lng']
+class ODriverConfig(object):
+    DRIVER_NAME = 'OPy'
+    DRIVER_VERSION = '0.1'
+    SERIALIZATION = OSerialization.SERIALIZATION_BINARY

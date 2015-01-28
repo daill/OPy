@@ -1,6 +1,20 @@
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 
-from database.o_db_constants import OOperationType, OConst, OTypes, ORecordKind, ORecordType, ORidBagType
+from database.o_db_constants import OOperationType, OConst, OProfileType, ORecordKind, ORecordType, ORidBagType
 from common.o_db_exceptions import ProfileNotMatchException
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
@@ -297,7 +311,7 @@ class OOperationRequestCommand(OOperation):
 
                 if process_counter == (len(elements)-1):
                     size = len(result)
-                    command_payload_length = pack_data(type=OTypes.INT.value, value=size, name=command_payload_length_name)
+                    command_payload_length = pack_data(type=OProfileType.INT, value=size, name=command_payload_length_name)
                     result = orig_result + command_payload_length + result
 
             return result
@@ -331,7 +345,7 @@ class OOperationRequestCommand(OOperation):
             """
             nonlocal data_dict
             data_dict = {}
-            rest, value = unpack_data(OTypes.SHORT.value, rest, name="record-kind")
+            rest, value = unpack_data(OProfileType.SHORT, rest, name="record-kind")
             elements = ORecord(ORecordKind(value)).getresponseprofile().getelements()
             # parse each record
             for sub_element in elements:
@@ -371,7 +385,7 @@ class OOperationRequestCommand(OOperation):
                     elif synch_result_type == 'l':
                         logging.debug("parsing record list command response")
                         # list of records
-                        rest, count = unpack_data(OTypes.INT.value, rest, name="count")
+                        rest, count = unpack_data(OProfileType.INT, rest, name="count")
 
                         for i in range(count):
                             rest = parserecord(main_dict, rest, element.name)
@@ -379,7 +393,7 @@ class OOperationRequestCommand(OOperation):
                     elif synch_result_type == 'a':
                         logging.debug("parsing serialized records command response")
 
-                        rest, type = unpack_data(OTypes.STRING.value, rest, name="type")
+                        rest, type = unpack_data(OProfileType.STRING, rest, name="type")
 
                         # serialized result
                         # TODO implement
@@ -388,7 +402,7 @@ class OOperationRequestCommand(OOperation):
                     if self.__protocol_version > 17:
                         logging.debug("using new version of command response parsing")
                         while len(rest) > 0:
-                            rest, status = unpack_data(OTypes.BYTE.value, rest, name="status")
+                            rest, status = unpack_data(OProfileType.BYTE, rest, name="status")
                             if status == 2:
                                 rest = parserecord(main_dict, rest, element.name)
 
@@ -414,7 +428,7 @@ class OOperationRequestCommand(OOperation):
 
 
                 # handle record
-                if element.type == OTypes.RECORD.value:
+                if element.type == OProfileType.RECORD:
                     record = ORecord(value)
 
                     # save main state

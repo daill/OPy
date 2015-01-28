@@ -1,8 +1,23 @@
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 
 from database.o_db_connection import OConnection
-from database.o_db_constants import OStorageTypes, ODBType, ODriver, OModeInt, ORecordType, OModeChar, OCommandClass, \
+from database.o_db_constants import OStorageTypes, ODBType, OModeInt, ORecordType, OModeChar, OCommandClass, \
     OSerialization
+from database.o_db_driverconfig import ODriverConfig
 from database.protocol.o_op_connect import OOperationConnect
 from database.protocol.o_op_db import OOperationDBClose, OOperationDBCreate, OOperationDBExist, OOperationDBList, \
     OOperationDBOpen, OOperationDBReload, \
@@ -81,13 +96,13 @@ class ODB:
             operation_connect = OOperationConnect()
 
             # create data for initial connect
-            data = {"driver-name": ODriver.DRIVER_NAME.value,
-                    "driver-version": ODriver.DRIVER_VERSION.value,
-                    "protocol-version": connection.getprotocolversion(),
+            data = {"driver-name": ODriverConfig.DRIVER_NAME,
+                    "driver-version": ODriverConfig.DRIVER_VERSION,
+                    "protocol-version": connection.protocol_version,
                     "client-id": '-1',
                     "user-name": user_name,
                     "token-session": 1,
-                    "serialization-impl": OSerialization.SERIALIZATION_BINARY.value,
+                    "serialization-impl": ODriverConfig.SERIALIZATION.value,
                     "user-password": user_password}
 
             result_data = connection.exec(operation_connect, data)
@@ -110,15 +125,15 @@ class ODB:
         try:
 
             # create data for initial connect
-            request_data = {"driver-name": ODriver.DRIVER_NAME.value,
-                            "driver-version": ODriver.DRIVER_VERSION.value,
-                            "protocol-version": connection.getprotocolversion(),
+            request_data = {"driver-name": ODriverConfig.DRIVER_NAME,
+                            "driver-version": ODriverConfig.DRIVER_VERSION,
+                            "protocol-version": connection.protocol_version,
                             "client-id": "",
                             "user-name": user_name,
                             "user-password": user_password,
                             "token-session": 1,
                             "database-name": database_name,
-                            "serialization-impl": OSerialization.SERIALIZATION_BINARY.value,
+                            "serialization-impl": ODriverConfig.SERIALIZATION.value,
                             "database-type": database_type}
 
             operation = OOperationDBOpen()
@@ -449,7 +464,7 @@ class ODB:
             if isinstance(command_payload, OSQLPayload):
                 request_data.update(command_payload.getdata())
 
-            operation = OOperationRequestCommand(command_payload, connection.getprotocolversion())
+            operation = OOperationRequestCommand(command_payload, connection.protocol_version)
 
             if mode == OModeInt.ASYNCHRONOUS:
                 operation.setasync(True)

@@ -1,12 +1,29 @@
+# Copyright 2015 Christian Kramer
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import logging
 import inspect
 import binascii
 
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
 from client.o_db_set import Select, Class, QueryType, Vertex, Edge
-from common.o_db_exceptions import OPyClientException, ParsingError
-from database.o_db_connection import OConnection, OProfileDecoder
-from database.o_db_constants import ODBType, OModeChar, OCommandClass, ORidBagType
+from common.o_db_exceptions import OPyClientException, SerializationException
+from database.o_db_codec import OCodec
+from database.o_db_connection import OConnection
+from database.o_db_constants import ODBType, OModeChar, OCommandClass, ORidBagType, OSerialization
+from database.o_db_driverconfig import ODriverConfig
+from database.o_db_serializer import OCSVSerializer, OBinarySerializer
 from database.protocol.o_op_request import OSQLCommand, ORidBag
 from database.o_db_ops import ODB
 
@@ -258,7 +275,7 @@ class OClient(object):
 
                                                     logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
 
-                                                except ParsingError as err:
+                                                except SerializationException as err:
                                                         logging.error(err)
 
                                             else:
@@ -291,65 +308,17 @@ class OClient(object):
         elif issubclass(clazz, BaseEdge):
             logging.debug("class is from type BaseEdge")
         else:
-            raise ParsingError("could not determine type of given class to parse")
+            raise SerializationException("could not determine type of given class to parse")
 
         if record_content:
-            # decode
-            decoded_str = record_content.decode("utf8")
-            # split by @ to retrieve name of class and separated list of fields
-            base_split = decoded_str.split('@')
-
-            if len(base_split) == 2:
-                class_name = base_split[0]
-                target_module = inspect.importlib.import_module(OClient.entities[class_name])
-                # instantiiate object by class name
-                targetClass = getattr(target_module, class_name)
-                instance = targetClass()
-                linkdict = dict()
-
-                field_list_str = base_split[1]
-
-                field_list = field_list_str.split(',')
-
-                logging.debug("extracted field list {}".format(field_list))
-
-                for field in field_list:
-                    field_split = field.split(':')
-                    if len(field_split) == 2:
-                        field_name = field_split[0].strip(' ')
-                        if field_split[1].find('"') != -1:
-                            field_value = field_split[1].strip('" ')
-
-                            if hasattr(instance, field_name):
-                                setattr(instance, field_name, field_value)
-
-                            logging.debug("parse field {} with value {}".format(field_name, field_value))
-                        else:
-                            # possible base64 string
-                            field_value = field_split[1].strip('%; ')
-                            base64_binary = binascii.a2b_base64(field_value)
-                            logging.debug("decoded base64: " + str(base64_binary))
-
-
-                            parser = OProfileDecoder()
-                            data_dict = parser.decode(ORidBag(ORidBagType.EMBEEDED), base64_binary)
-
-                            logging.debug("decoded base64: " + str(base64_binary))
-
-                            # map ids to instance
-                            instance.linkdict[field_name] = data_dict['links']
-
-                            logging.debug("parsed data from base64: {}".format(data_dict))
-
-
-                    else:
-                        raise ParsingError("could not split '{}' by :".format(field))
-
-                return instance
+            if ODriverConfig.SERIALIZATION == OSerialization.SERIALIZATION_CSV:
+                serializer = OCSVSerializer()
             else:
-                raise ParsingError("could not split record content '{}' by @".format(decoded_str))
+                serializer = OBinarySerializer()
+            serializer.entities = self.entities
+            return serializer.decode(record_content)
         else:
-            raise ParsingError("record content string is empty")
+            raise SerializationException("record content string is empty")
 
 
     # build entity dict
