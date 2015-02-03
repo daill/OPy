@@ -13,42 +13,14 @@
 # limitations under the License.
 
 import logging
-from database.o_db_constants import OOperationType, OConst, ORecordKind
+
+from database.o_db_constants import OOperationType, OConst
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
 
+
 __author__ = 'daill'
 
-class ORecord(object):
-    """
-    This class represents a record.
-
-    -3 for RID
-    -2 for null record
-    Everything else for a record
-    """
-    def __init__(self, kind:ORecordKind):
-        self.__kind = kind
-
-        self.__rid_profile_str = "(cluster-id:short)(cluster-position:long)"
-        self.__record_profile_str = "(record-type:byte)(cluster-id:short)(cluster-position:long)(record-version:int)(record-content:bytes)"
-        self.__record_profile = None
-        self.__rid_profile = None
-
-    def getresponseprofile(self):
-        profile_parser = OProfileParser()
-
-        if self.__kind == ORecordKind.NULL:
-            # do nothing return empty profile
-            return profile_parser.parse("")
-        elif self.__kind == ORecordKind.RID:
-            if self.__rid_profile is None:
-                self.__rid_profile = profile_parser.parse(self.__rid_profile_str)
-            return self.__rid_profile
-        else:
-            if self.__record_profile is None:
-                self.__record_profile = profile_parser.parse(self.__record_profile_str)
-            return self.__record_profile
 
 class OOperationRecordUpdate(OOperation):
     def __init__(self):

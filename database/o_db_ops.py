@@ -25,7 +25,8 @@ from database.protocol.o_op_db import OOperationDBClose, OOperationDBCreate, OOp
 from database.protocol.o_op_record import OOperationRecordCreate, OOperationRecordLoad, OOperationRecordUpdate, \
     OOperationRecordDelete
 from database.protocol.o_op_request import OOperationRequestConfigGet, OOperationRequestConfigList, \
-    OOperationRequestConfigSet, OOperationRequestCommand, OSQLPayload, OOperationRequestTXCommit
+    OOperationRequestConfigSet, OOperationRequestCommand, OOperationRequestTXCommit
+from common.o_db_model import OSQLPayload
 
 
 __author__ = 'daill'

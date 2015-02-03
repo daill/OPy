@@ -14,11 +14,12 @@
 
 import logging
 
-from database.o_db_constants import OOperationType, OConst, OProfileType, ORecordKind, ORecordType, ORidBagType
+from common.o_db_model import OSQLPayload, ORecord
+
+from database.o_db_constants import OOperationType, OConst, OProfileType, ORecordKind
 from common.o_db_exceptions import ProfileNotMatchException
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
-from database.protocol.o_op_record import ORecord
 
 
 __author__ = 'daill'
@@ -169,61 +170,6 @@ class OOperationRequestConfigList(OOperation):
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
 
-class OSQLPayload(object):
-    """
-    Base class for any SQLCommand.
-    """
-    def __init__(self):
-        self.__data_dict = dict()
-
-    def getdata(self):
-        return self.__data_dict
-
-    def getprofilestr(self):
-        return self.__sql_profile_str
-
-class OSQLCommand(OSQLPayload):
-    """
-    Represents a SQLCommand. The fetchplan is only used in case of a select command, otherwise its empty.
-
-    See https://github.com/orientechnologies/orientdb/wiki/Fetching-Strategies
-    """
-    def __init__(self, text:str, non_text_limit:int, fetchplan:str, serialized_params:str):
-        super().__init__()
-        self._OSQLPayload__sql_profile_str = "(text:string)(non-text-limit:int)(fetchplan:string)(serialized-params:bytes)"
-        self._OSQLPayload__data_dict = {"text":text,
-                                        "non-text-limit":non_text_limit,
-                                        "fetchplan":fetchplan,
-                                        "serialized-params":serialized_params}
-
-class OSQLClassName(OSQLPayload):
-    """
-    Represents a SQLCommand. The fetchplan is only used in case of a select command, otherwise its empty.
-
-    See https://github.com/orientechnologies/orientdb/wiki/Fetching-Strategies
-    """
-    def __init__(self, text:str, non_text_limit:int, fetchplan:str, serialized_params:str):
-        super().__init__()
-        self._OSQLPayload__sql_profile_str = "(text:string)(non-text-limit:int)(fetchplan:string)(serialized-params:bytes)"
-        self._OSQLPayload__data_dict = {"text":text,
-                                        "non-text-limit":non_text_limit,
-                                        "fetchplan":fetchplan,
-                                        "serialized-params":serialized_params}
-
-class OSQLScriptCommand(OSQLPayload):
-    """
-    Represents a SQLScriptCommand. The fetchplan is only used in case of a select command, otherwise its empty.
-
-    See https://github.com/orientechnologies/orientdb/wiki/Fetching-Strategies
-    """
-    def __init__(self, language:str, text:str, non_text_limit:int, fetchplan:list, serialized_params:str):
-        super().__init__()
-        self._OSQLPayload__sql_profile_str = "(language:string)(text:string)(non-text-limit:int)(fetchplan:string)(serialized-params:bytes)"
-        self._OSQLPayload__data_dict = {"language":language,
-                                        "text":text,
-                                        "non-text-limit":non_text_limit,
-                                        "fetchplan":fetchplan,
-                                        "serialized-params":serialized_params}
 
 class OOperationRequestCommand(OOperation):
     """
@@ -403,8 +349,14 @@ class OOperationRequestCommand(OOperation):
                         logging.debug("using new version of command response parsing")
                         while len(rest) > 0:
                             rest, status = unpack_data(OProfileType.BYTE, rest, name="status")
-                            if status == 2:
+                            if status > 0:
+                                # read record
+                                length = len(main_dict)
                                 rest = parserecord(main_dict, rest, element.name)
+
+                                if len(main_dict) > length and status == 2:
+                                    # do something
+                                    pass
 
                 else:
                     while True:
@@ -474,47 +426,6 @@ class OOperationRequestCommand(OOperation):
         # return the status (OK|Error) to decide what to do next and the extracted data
         return data_dict, status
 
-class OTXEntry:
-    """
-    Base class for all possible tx operations like CREATE, DELETE and UPDATE
-    """
-    def __init__(self, operation_type:bytes, record_type:ORecordType, cluster_id:int, cluster_position:int):
-        self._request_base_profile = "(operation-type:byte)(cluster-id:short)(cluster-position:long)(record-type:byte)"
-        self._request_profile = None
-        self._data = {"operation-type": operation_type,
-                      "cluster-id": cluster_id,
-                      "cluster-position": cluster_position,
-                      "begin": 1,
-                      "record-type": record_type}
-
-    def getdata(self):
-        return self._data
-
-    def getprofile(self):
-        return self._request_profile
-
-class OTXOperationCreate(OTXEntry):
-    """
-    For temporary RID's in transactions we have to use -1 as clusterid and <-1 for clusterposition
-    """
-    def __init__(self, record_type:ORecordType, record_content:bytes, record_id:int):
-        super().__init__(3, record_type, -1, record_id)
-        self._request_profile = self._request_base_profile + "(record-content:bytes)"
-        self._data.update({"record-content": record_content})
-
-class OTXOperationUpdate(OTXEntry):
-    def __init__(self, record_type:ORecordType, cluster_id:int, cluster_position:int, version:int, content_changed:bool, record_content:bytes):
-        super().__init__(1, record_type, cluster_id, cluster_position)
-        self._request_profile = self._request_base_profile + "(version:int)(record-content:bytes)"
-        self._data.update({"version": version,
-                           "content-changed": content_changed,
-                           "record-content": record_content})
-
-class OTXOperationDelete(OTXEntry):
-    def __init__(self, record_type:ORecordType, cluster_id:int, cluster_position:int, version:int):
-        super().__init__(2, record_type, cluster_id, cluster_position)
-        self._request_profile = self._request_base_profile + "(version:int)"
-        self._data.update({"version": version})
 
 class OOperationRequestTXCommit(OOperation):
     def __init__(self, entries_profile:str):
@@ -667,112 +578,6 @@ class OOperationRequestTXCommit(OOperation):
             return processprofile(self.getrequestprofile().getelements())
 
         return b''
-
-class ORidBag(object):
-    """
-    If config
-    Rid format (cluster-id:short)(cluster-position:long)
-    """
-    def __init__(self, type:ORidBagType):
-        self.__config_str = "(config:byte)"
-        # optional uuid
-        self.__temp_uuid = "(most-sig-bits:long)(least-sig-bits:long)"
-        self.__embedded_str = "(size:int)[{links}(cluster-id:short)(cluster-position:long)]*"
-        self.__tree_str = "(fileId:long)(pageIndex:long)(pageOffset:int)(size:int)(changesSize:int)[[{links}(cluster-id:short)(cluster-position:long)](changeType:byte)(value:int)]*"
-
-        self.__temp_uuid_profile = None
-        self.__config_profile = None
-        self.__embedded_profile = None
-        self.__tree_profile = None
-
-        self.__ridbagtype = type
-
-    def getconfigprofile(self):
-        if self.__config_profile is None:
-            profile_parser = OProfileParser()
-            self.__config_profile = profile_parser.parse(self.__config_str)
-
-        return self.__config_profile
-
-    def getuuidprofile(self):
-        if self.__temp_uuid_profile is None:
-            profile_parser = OProfileParser()
-            self.__temp_uuid_profile = profile_parser.parse(self.__temp_uuid)
-
-        return self.__temp_uuid_profile
-
-    def getembeddedprofile(self):
-        if self.__embedded_profile is None:
-            profile_parser = OProfileParser()
-            self.__embedded_profile = profile_parser.parse("{}{}".format(self.__config_str,self.__embedded_str))
-
-        return self.__embedded_profile
-
-    def gettreeprofile(self):
-        if self.__tree_profile is None:
-            profile_parser = OProfileParser()
-            self.__tree_profile = profile_parser.parse(self.__tree_str)
-
-        return self.__tree_profile
-
-    def decode(self, unpack_data, data):
-        """
-        Decodes the embedded variant of a ridbag
-
-        :param unpack_data:
-        :param data:
-        :return:
-        """
-        data_dict = {}
-        rest = data
-        num_repeats = 0
-
-        def processelement(element: OElement):
-            nonlocal rest, data_dict
-
-            if isinstance(element, OGroup):
-                nonlocal num_repeats
-
-                # save main state
-                main_dict = data_dict
-
-                main_dict[element.name] = list()
-
-                while (num_repeats > 0):
-                    data_dict = {}
-                    for sub_element in element.getelements():
-                        rest = processelement(sub_element)
-                    num_repeats -= 1
-                    main_dict[element.name].append(data_dict)
-
-                data_dict = main_dict
-            else:
-                # handling of a term
-                rest, value = unpack_data(element.type, rest, name=element.name)
-                data_dict[element.name] = value
-
-                if element.name == 'size':
-                    num_repeats = value
-            return rest
-
-        def processprofile(elements):
-            """
-            Iterate of the whole set of profile elements and unpack them
-            :param elements:
-            :return:
-            """
-            for element in elements:
-                processelement(element)
-
-            return OConst.OK
-
-        if ORidBagType.EMBEEDED == self.__ridbagtype:
-            status = processprofile(self.getembeddedprofile().getelements())
-        elif ORidBagType.TREE == self.__ridbagtype:
-            status = processprofile(self.gettreeprofile().getelements())
-
-        # return the status (OK|Error) to decide what to do next and the extracted data
-        return data_dict, status
 
 
 class OOPerationRequestRidBagGetSize(OOperation):

@@ -12,66 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from io import BytesIO
 import logging
 import inspect
 import binascii
-import struct
+
 from common.o_db_exceptions import SerializationException
 from database.o_db_codec import OCodec
-from database.o_db_constants import OConst, ORidBagType
-from database.o_db_profile_parser import OProfileParser, OElement, OGroup
-from database.protocol.o_op_request import ORidBag
+from database.o_db_constants import ORidBagType
+from common.o_db_model import ORidBagDocument
+
 
 __author__ = 'daill'
-
-class OVarInteger(object):
-    """
-    Class to provide methods to create unsigned varints
-    See https://developers.google.com/protocol-buffers/docs/encoding?csw=1 and OVarIntSerializer
-
-    Code partially taken from https://gist.github.com/nickelpro/7312782
-    """
-    def __init__(self):
-        pass
-
-    def signedtounsigned(self, value):
-        # val = ((value ^ ~value)<<1) ^ (value >> 63)
-        val = (value << 1) ^ (value >> 63)
-        if (val == 0xfffffffffffffffe):
-            val = -2
-        return val
-
-    def decode(self, buffer):
-        total = 0
-        shift = 0
-        bbuff = BytesIO(buffer)
-        while True:
-            val = struct.unpack('B', bbuff.read(1))[0]
-            if (val & 0x80) == 0x00:
-                break
-            total |= ((val & 0x7F) << shift)
-
-            shift += 7
-            if shift > 63:
-                raise Exception("varint too long")
-
-        raw = total | (val << shift)
-        temp = ((raw % -2) ^ raw) >> 1
-        return temp ^ (total & -(1 << 63))
-
-    def encode(self, value):
-        _value = self.signedtounsigned(value)
-        total = b''
-        while (_value & 0xFFFFFFFFFFFFFF80) != 0x00:
-            bits = (_value & 0x7F | 0x80)
-            _value >>= 7
-            if _value == -1:
-                _value = 0x1FFFFFFFFFFFFFF
-            total += struct.pack('B', bits)
-        bits = _value & 0x7F
-        total += struct.pack('B', bits)
-        return total
 
 
 class OSerializer(object):
@@ -89,83 +40,40 @@ class OBinarySerializer(OSerializer):
     This class provides all necessary code to decode a binary encoded record and vice versa with the following structure:
 
     version: (version:byte)
-    class name: (className:string)
+    class name: (className)(className:string)
     header (repeating until field_name_length is 0): [{header}(field_name_length:int)(field_name:string)(pointer_to_data:int)(data_type:byte)]*
     data: depends on the type of data and position
 
     """
     def __init__(self):
         self.__codec = OCodec()
-        self.__schema_profile_str = "(version:byte)(className:string-varint)"
-        self.__schema_profile = None
-        self.__header_profile_str = "[{header}(field_name_length:varint)(field_name:string)(pointer_to_data:int)(data_type:byte)]*"
-        self.__header_profile = None
-        # this will be computed on the fly
-        self.__data_profile = None
 
     def encode(self, data):
         pass
 
+
+
     def decode(self, data):
-        # parse the static header profiles
-        if not self.__schema_profile:
-            self.__schema_profile = OProfileParser().parse(self.__schema_profile_str)
+        if len(data) != 0:
+            # start deserializing
+            # first read byte
+            version, rest = self.__codec.readbyte(data)
 
-        if not self.__header_profile:
-            self.__header_profile = OProfileParser().parse(self.__header_profile_str)
+            # read class name
+            class_name, rest = self.__codec.readvarintstring(rest)
 
-        data_dict = {}
-        error_state = False
-        rest = data
-        group_repeat = 0
-
-        def processelement(element: OElement):
-            nonlocal rest, data_dict, group_repeat
-
-            if isinstance(element, OGroup):
-
-                # save main state
-                main_dict = data_dict
-
-                main_dict[element.name] = list()
-
-                while (group_repeat > 0):
-                    data_dict = {}
-                    for sub_element in element.getelements():
-                        rest = processelement(sub_element)
-                    group_repeat -= 1
-                    main_dict[element.name].append(data_dict)
-
-                data_dict = main_dict
-            else:
-                # handling of a term
-                rest, value = self.__codec.unpackdata(element.type, rest, name=element.name)
-
-                if element.name == "num-cfg-items":
-                    # save value as indicator how often the following group will be repeated
-                    group_repeat = value
-
-                data_dict[element.name] = value
-            return rest
-
-        def processprofile(elements):
-            """
-            Iterate of the whole set of profile elements and unpack them
-            :param elements:
-            :return:
-            """
-            for element in elements:
-                # fetch an error if it occurs
-                nonlocal error_state
-                if error_state:
-                    return OConst.ERROR
-
-                processelement(element)
-
-            return OConst.OK
+            # read fields and pointers
+            while True:
+                length, rest = self.__codec.readvarint(rest)
+                if length == 0:
+                    break
+                field_name, rest = self.__codec.readvarintstring(rest)
+                pos, rest = self.__codec.readint(rest)
+                type, rest = self.__codec.readbyte(rest)
 
 
-        status = processprofile(self.__schema_profile.getelements())
+        pass
+
 
 class OCSVSerializer(OSerializer):
     def __init__(self):
@@ -213,7 +121,7 @@ class OCSVSerializer(OSerializer):
 
 
                         parser = OCodec()
-                        data_dict = parser.decode(ORidBag(ORidBagType.EMBEEDED), base64_binary)
+                        data_dict = parser.decode(ORidBagDocument(ORidBagType.EMBEEDED), base64_binary)
 
                         logging.debug("decoded base64: " + str(base64_binary))
 

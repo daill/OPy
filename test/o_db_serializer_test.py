@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from database.o_db_serializer import OVarInteger
+from common.o_db_model import OVarInteger
 
 __author__ = 'daill'
 
@@ -28,25 +28,25 @@ class ODBSerializerTests(unittest.TestCase):
     def test_varint_maxlong(self):
         value = 9223372036854775807
         bytes = OVarInteger().encode(value)
-        varint = OVarInteger().decode(bytes)
+        pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
 
     def test_varint_maxminus1(self):
         value = 9223372036854775806
         bytes = OVarInteger().encode(value)
-        varint = OVarInteger().decode(bytes)
+        pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
 
     def test_varint(self):
         value = 300
         bytes = OVarInteger().encode(value)
-        varint = OVarInteger().decode(bytes)
+        pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
 
     def test_varint_one(self):
         value = 1
         bytes = OVarInteger().encode(value)
-        varint = OVarInteger().decode(bytes)
+        pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
 
 
