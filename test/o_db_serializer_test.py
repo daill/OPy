@@ -14,6 +14,7 @@
 
 import unittest
 from common.o_db_model import OVarInteger
+from database.o_db_codec import OCodec
 
 __author__ = 'daill'
 
@@ -48,6 +49,19 @@ class ODBSerializerTests(unittest.TestCase):
         bytes = OVarInteger().encode(value)
         pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
+
+    def test_varint_three(self):
+        value = 3
+        bytes = OVarInteger().encode(value)
+        pos, varint = OVarInteger().decode(bytes)
+        self.assertEqual(value, varint)
+
+    def test_embeddedmap(self):
+        values = {'a':1, 'b':2, 'c':3}
+        codec = OCodec()
+        bytes = codec.writeembeddedmap(values)
+        result = codec.readembeddedmap(bytes)
+        self.assertEqual(values, result[0])
 
 
 if __name__ == "__main__":

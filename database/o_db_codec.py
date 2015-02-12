@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from datetime import datetime
+import inspect
 
 import logging
 import struct
-from common.o_db_exceptions import WrongTypeException, NotConnectedException
+from client.o_db_base import BaseVertex
+from common.o_db_exceptions import WrongTypeException, NotConnectedException, SerializationException, \
+    TypeNotFoundException
 from common.o_db_model import ORidBagBinary, OVarInteger
 from database.o_db_constants import OProfileType, OConst, OBinaryType
 from database.o_db_profile_parser import OCondition
@@ -28,24 +31,192 @@ __author__ = 'daill'
 class OCodec(object):
     def __init__(self):
         self.position = 0
+        self.encode = None
+        self.decode = None
+
+    def findotype(self, value):
+        if isinstance(value, int):
+            if value >= 0xFFFFFFFF:
+                return OBinaryType.INTEGER
+            else:
+                return OBinaryType.LONG
+        elif isinstance(value, bool):
+            return OBinaryType.BOOLEAN
+        elif isinstance(value, float):
+            return OBinaryType.DOUBLE
+        elif isinstance(value, str):
+            return OBinaryType.STRING
+        elif isinstance(value, bytes):
+            return OBinaryType.BYTE
+        elif isinstance(value, list):
+            return OBinaryType.EMBEDDEDLIST
+        elif isinstance(value, dict):
+            return OBinaryType.EMBEDDEDMAP
+        else:
+            raise TypeNotFoundException("type '{}' of value '{}' has no corresponding OBinaryType".format(type(value), value))
+
+    def writevarint(self, value):
+        return OVarInteger().encode(value)
+
+    def writevarintstring(self, value:str):
+        length = len(value)
+        result = self.writevarint(length)
+        result += self.writebytes(length, value)
+        return result
+
+    def writeotype(self, value):
+        return self.writebyte(value)
+
+    def writestring(self, value):
+        length = len(value)
+        result = self.writeint(len(value))
+        result += self.writebytes(length, value)
+        return result
+
+    def writeboolean(self, value):
+        return struct.pack(">b", value)
+
+    def writedate(self, value):
+        local_timezone_offset = (datetime.now().hour-datetime.now(datetime.timezone.utc).hour)*3600000
+        value += local_timezone_offset
+        return self.writevarint(value)
+
+    def writeembeddedcollection(self, values):
+        if len(values) > 0:
+            result = self.writevarint(len(values))
+
+            type = self.findotype(OBinaryType.ANY)
+            result += self.writeotype(type)
+
+            # iterate through the items
+            for value in values:
+                type = self.findotype(value)
+                result += self.writeotype(type)
+                result += self.writevalue(type, value)
+
+            return result
+
+    def writeembedded(self, value):
+        if isinstance(value, BaseVertex):
+            logging.debug("serialize vertex")
+            self.encode(value)
+        else:
+            # edge
+            logging.debug("serialize edge")
+
+    def writeembeddedmap(self, values):
+        if len(values) > 0:
+            result_header = self.writevarint(len(values))
+            result_values = b''
+            header_dict = dict()
+            value_dict = dict()
+            byte_count = len(result_header)
+
+            for key in values:
+                temp_header_bytes = b''
+                temp_value_bytes = b''
+
+                # keys are strings
+                temp_header_bytes += self.writeotype(OBinaryType.STRING)
+                temp_header_bytes += self.writevarintstring(key)
+
+                header_dict[key] = temp_header_bytes
+                byte_count += len(temp_header_bytes) + 4
+
+                value = values[key]
+                type = self.findotype(value)
+                temp_value_bytes += self.writeotype(type)
+                temp_value_bytes += self.writevalue(type, value)
+                value_dict[key] = temp_value_bytes
+
+
+            for key in values:
+                # join the two dict to write the correct position
+                result_header += header_dict[key]
+                result_header += self.writeint(byte_count)
+
+                value_byte = value_dict[key]
+                result_values += value_byte
+                byte_count += len(value_byte)
+
+            return result_header + result_values
+
+
+    def writelinkcollection(self, values):
+        if len(values) > 0:
+            result = self.writevarint(len(values))
+
+            for value in values:
+                if isinstance(value, BaseVertex):
+                    # requires that the value has been already written to database otherwise theres no rid
+                    result += self.writelink((value.clusterid, value.clusterposition))
+
+
+    def writelinkmap(self, values):
+        if len(values) > 0:
+            result = self.writevarint(len(values))
+
+            for key in values:
+                # keys are strings
+                result += self.writeotype(OBinaryType.STRING)
+                result += self.writevarintstring(key)
+
+                value = values[key]
+                if isinstance(value, BaseVertex):
+                    result += self.writelink((value.clusterid, value.clusterposition))
+
+            return result
+
+    def writelink(self, value):
+        if isinstance(value, tuple):
+            # write cluster id
+            result = self.writevarint(value[0])
+            # write cluster position
+            result += self.writevarint(value[1])
+        else:
+            logging.error("could not serialize link in fact of a wrong value type. Should be tuple is '{}'".format(type(value)))
+
+    def writenulllink(self):
+        return self.writelink(-2, -1)
+
+    def writebyte(self, value):
+        if isinstance(value, str):
+            return struct.pack(">c", value.encode("utf-8"))
+        else:
+            return struct.pack(">b", value)
+
+    def wrieshort(self, value):
+        return struct.pack(">h", value)
+
+    def writeint(self, value):
+        return struct.pack(">i", value)
+
+    def writelong(self, value):
+        return struct.pack(">q", value)
+
+    def writedouble(self, value):
+        return struct.pack(">d", value)
+
+    def writefloat(self, value):
+        return struct.pack(">f", value)
+
+    def writebytes(self, length, value):
+        return struct.pack(">{}s".format(length), value.encode('utf-8'))
 
     def packdata(self, type, value, name=" "):
         if not 'pass' in name:
-            logging.debug("packing '{}' with type {} and value '{}'".format(name, type, value))
+            logging.debug("packing '{}' with type '{}' and value '{}'".format(name, type, value))
 
         if type == OProfileType.BOOLEAN:
-            return struct.pack(">b", value)
+            return self.writeboolean(value)
         elif type == OProfileType.BYTE:
-            if isinstance(value, str):
-                return struct.pack(">c", value.encode("utf-8"))
-            else:
-                return struct.pack(">b", value)
+            return self.writebyte(value)
         elif type == OProfileType.SHORT:
-            return struct.pack(">h", value)
+            return self.wrieshort(value)
         elif type == OProfileType.INT:
-            return struct.pack(">i", value)
+            return self.writeint(value)
         elif type == OProfileType.LONG:
-            return struct.pack(">q", value)
+            return self.writelong(value)
             # elif type == OTypes.BYTES.value:
             # if isinstance(value, builtins.bytes):
             #     length = len(value)
@@ -54,31 +225,31 @@ class OCodec(object):
             #     raise WrongTypeException("wrong value type for {} type".format(type))
         elif type == OProfileType.STRING or type == OProfileType.BYTES:
             if value == '-1' or value == -1 and type == OProfileType.STRING:
-                return struct.pack(">i", -1)
+                return self.writeint(-1)
             elif isinstance(value, str):
                 length = len(value)
-                return struct.pack(">i {}s".format(length), length, value.encode('utf-8'))
+                return self.writestring(length, value)
             else:
-                raise WrongTypeException("wrong value type for {} type".format(type))
+                raise WrongTypeException("wrong value type for '{}' type".format(type))
         elif type == OProfileType.RECORDS:
             # TODO: implement
             pass
         elif type == OProfileType.STRINGS:
             if isinstance(value, list):
                 bytes = ''
-                bytes += struct.pack(">i", len(value))
+                bytes += self.writeint(len(value))
                 for string in value:
                     string_length = len(string)
-                    bytes += struct.pack(">i {}s".format(string_length), string_length, string.encode('utf-8'))
+                    bytes += self.writestring(string_length, string)
                 return bytes
             else:
-                raise WrongTypeException("wrong value type for {} type".format(type))
+                raise WrongTypeException("wrong value type for '{}' type".format(type))
         elif type == OProfileType.DYNAMIC:
-
+            # TODO: implement
             pass
 
     def unpackdata(self, type, data, condition: OCondition=None, name=""):
-        logging.debug("unpacking '{}' with type {}".format(name, type))
+        logging.debug("unpacking '{}' with type '{}'".format(name, type))
 
         if type == OProfileType.BOOLEAN:
             result, rest = self.readboolean(data)
@@ -149,12 +320,14 @@ class OCodec(object):
     def readvarint(self, data):
         pos, varint = OVarInteger().decode(data)
         rest = data[pos:]
+        self.position += len(data)-len(rest)
         return varint, rest
 
     def readvarintstring(self, data):
-        class_name_length, rest = self.readvarint(data)
-        class_name, rest = struct.unpack('>{}s'.format(class_name_length), rest[:class_name_length])[0], rest[class_name_length:]
-        return class_name, rest
+        length, rest = self.readvarint(data)
+        value, rest = struct.unpack('>{}s'.format(length), rest[:length])[0], rest[length:]
+        self.position += length
+        return bytes.decode(value, 'utf-8'), rest
 
     def readbyte(self, data):
         self.position+=1
@@ -202,7 +375,6 @@ class OCodec(object):
 
     def readbinary(self, data):
         length, rest = self.readvarint(data)
-        self.position+=length
         return self.readbytes(length, rest)
 
     def readembeddedcollection(self, data):
@@ -238,15 +410,16 @@ class OCodec(object):
             key_type, rest = self.readbyte(rest)
             key, rest = self.readvalue(key_type, rest)
             pos, rest = self.readint(rest)
-            value_type, rest = self.readbyte(rest)
 
-            # due to the implementation it necessary to calculate the actual position in
+            # due to the implementation its necessary to calculate the actual position in
             # byte array to extract the value of each key. Afterwards we have to cumulate the
             # read bytes to receive the complete amount of read bytes
 
             estimated_position = pos-self.position
             last_position = self.position
 
+            value_type, temp_rest = self.readbyte(rest[estimated_position:])
+            estimated_position += 1
             value, temp_rest = self.readvalue(value_type, rest[estimated_position:])
             delta += self.position-estimated_position
             
@@ -258,7 +431,7 @@ class OCodec(object):
         self.position += delta
 
 
-        return result, rest
+        return result, rest[self.position:]
 
     def readlink(self, data):
         cluster_id, rest = self.readvarint(data)
@@ -305,9 +478,9 @@ class OCodec(object):
         logging.debug("read embeddedridbag")
         value, rest = self.readint(data)
         content_size = value * 10 + 4
-        size, rest = self.readint(rest)
+        size, rest = self.readint(data)
 
-        content, rest = self.readbytes(content_size, rest)
+        content, rest = self.readbytes(content_size, data)
 
         ridbag = ORidBagBinary()
         ridbag.size = size
@@ -321,8 +494,11 @@ class OCodec(object):
         entries = list()
 
         for i in range(entries_size):
-            link, content_rest = self.readlink(content_rest)
-            entries.append(link)
+            id, content_rest = self.readshort(content_rest)
+            position, content_rest = self.readlong(content_rest)
+            # link, content_rest = self.readlink(content_rest)
+
+            entries.append((id, position))
 
             # should we read all the records here?
             logging.debug("automatic record loading is not yet implemented")
@@ -342,19 +518,57 @@ class OCodec(object):
         """
         logging.debug("read ridbag")
 
+        type, rest = self.readbyte(data)
+
         if (type & 2) == 2:
             logging.debug("read uuid")
             # reads the uuid tuple
-            uuid, rest = self.readuuid(data)
+            uuid, rest = self.readuuid(rest)
 
-        type, rest = self.readbyte(data)
         if (type & 1) == 1:
             logging.debug("read embedded")
             # embedded
-            ridbag, rest = self.readembeddedridbag(data)
+            ridbag, rest = self.readembeddedridbag(rest)
         else:
             logging.debug("read tree")
             # tree
+            pass
+
+        return ridbag, rest
+
+    def writevalue(self, type, value):
+        otype = OBinaryType(type)
+
+        if otype == OBinaryType.INTEGER or otype == OBinaryType.LONG or OBinaryType.SHORT:
+            return self.writevarint(value)
+        elif otype == OBinaryType.STRING:
+            return self.writevarintstring(value)
+        elif otype == OBinaryType.DOUBLE:
+            return self.writedouble(value)
+        elif otype == OBinaryType.FLOAT:
+            return self.writefloat(value)
+        elif otype == OBinaryType.BYTE:
+            return self.writebyte(value)
+        elif otype == OBinaryType.BOOLEAN:
+            return self.writeboolean(value)
+        elif otype == OBinaryType.DATETIME:
+            # as timestamp with format long
+            return self.writevarint(value)
+        elif otype == OBinaryType.DATE:
+            return self.writedate(value)
+        elif otype == OBinaryType.EMBEDDEDLIST or otype == OBinaryType.EMBEDDEDSET:
+            return self.writeembeddedcollection(value)
+        elif otype == OBinaryType.EMBEDDED:
+            return self.writeembedded(value)
+        elif otype == OBinaryType.LINKSET or otype == OBinaryType.LINKLIST:
+            return self.writelinkcollection(value)
+        elif otype == OBinaryType.LINKMAP:
+            return self.writelinkmap(value)
+        elif otype == OBinaryType.EMBEDDEDMAP:
+            return self.writeembeddedmap(value)
+        elif otype == OBinaryType.LINK:
+            return self.writelink(value)
+        elif otype == OBinaryType.LINKBAG:
             pass
 
 
@@ -373,13 +587,13 @@ class OCodec(object):
         if otype == OBinaryType.BOOLEAN:
             return self.readbyte(data)
         elif otype == OBinaryType.INTEGER:
-            return self.readint(data)
+            return self.readvarint(data)
         elif otype == OBinaryType.SHORT:
-            return self.readshort(data)
+            return self.readvarint(data)
         elif otype == OBinaryType.LONG:
-            return self.readlong(data)
+            return self.readvarint(data)
         elif otype == OBinaryType.STRING:
-            return self.readstring(data)
+            return self.readvarintstring(data)
         elif otype == OBinaryType.DOUBLE:
             return self.readdouble(data)
         elif otype == OBinaryType.FLOAT:
@@ -410,4 +624,6 @@ class OCodec(object):
             return self.readlinkmap(data)
         elif otype == OBinaryType.LINKBAG:
             return self.readridbag(data)
+
+
 

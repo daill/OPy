@@ -24,7 +24,7 @@ from database.o_db_connection import OConnection
 from database.o_db_constants import ODBType, OModeChar, OCommandClass, ORidBagType, OSerialization
 from database.o_db_driverconfig import ODriverConfig
 from database.o_db_serializer import OCSVSerializer, OBinarySerializer
-from database.protocol.o_op_request import OSQLCommand, ORidBag
+from common.o_db_model import ORidBagDocument, OSQLCommand
 from database.o_db_ops import ODB
 
 
@@ -52,7 +52,7 @@ class OClient(object):
             self.__odb.connect(self.__connection, user_name=user_name, user_password=user_password)
 
             # open the given database
-            self.__odb.dbopen(self.__connection, database_name=database, database_type=ODBType.DOCUMENT.value, user_name="root", user_password="root")
+            self.__odb.dbopen(self.__connection, database_name=database, database_type=ODBType.GRAPH.value, user_name="root", user_password="root")
 
         except Exception as err:
             logging.error(err)
@@ -264,16 +264,16 @@ class OClient(object):
 
                                                     parsedobject = self.parse_object(record_content=record.get("record-content"), clazz=clazz)
 
-                                                    parsedobject.setRID(clusterid, clusterposition)
-                                                    parsedobject.version = version
-
-                                                    if firstrun and isinstance(parsedobject, clazz):
-                                                        firstrun = False
-                                                        returningobject = parsedobject
-
-                                                    fetchedobjects[parsedobject.getRID()] = parsedobject
-
-                                                    logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
+                                                    # parsedobject.setRID(clusterid, clusterposition)
+                                                    # parsedobject.version = version
+                                                    #
+                                                    # if firstrun and isinstance(parsedobject, clazz):
+                                                    #     firstrun = False
+                                                    #     returningobject = parsedobject
+                                                    #
+                                                    # fetchedobjects[parsedobject.getRID()] = parsedobject
+                                                    #
+                                                    # logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
 
                                                 except SerializationException as err:
                                                         logging.error(err)
@@ -316,7 +316,13 @@ class OClient(object):
             else:
                 serializer = OBinarySerializer()
             serializer.entities = self.entities
-            return serializer.decode(record_content)
+
+            # get the deserialized data
+            data, class_name = serializer.decode(record_content)
+
+            parsedobject = serializer.toobject(class_name, data)
+
+            return parsedobject
         else:
             raise SerializationException("record content string is empty")
 
