@@ -27,7 +27,7 @@ The basic usage structur is as follows:
 	    # connect to server
     	odb.connect(connection, user_name="user", user_password="pass")
 		# connect to database
-	    odb.dbopen(connection, database_name="FanceGraphDB", 	database_type=ODBType.DOCUMENT.value, user_name="user", user_password="pass")
+	    odb.dbopen(connection, database_name="FancyGraphDB", 	database_type=ODBType.DOCUMENT.value, user_name="user", user_password="pass")
 	    
 	    ... 
 	    do stuff 
@@ -35,6 +35,9 @@ The basic usage structur is as follows:
 	    
 	    # close connection
 	    odb.dbclose(connection)
+	    
+## Notes
+On serializing a list auf records you have to make sure, that these records have been already written to the database. So its mandantory that theres a rid assigned to each object in the list.
 	    
 ## Implemented
 
