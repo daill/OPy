@@ -90,9 +90,12 @@ class ODBSerializerTests(unittest.TestCase):
 
         bytes = serializer.encode(location)
 
-        record, name = serializer.decode(bytes)
+        record, name, rest = serializer.decode(bytes)
         result_location = serializer.toobject(name, record)
 
+        self.assertEquals(location.__class__, result_location.__class__)
+        self.assertEquals(location.city.__class__, result_location.city.__class__)
+        self.assertEquals(location.city.name, result_location.city.name)
 
 if __name__ == "__main__":
     unittest.main()

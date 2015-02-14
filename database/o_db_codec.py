@@ -33,6 +33,7 @@ class OCodec(object):
         self.position = 0
         self.serialization_encoder = None
         self.serialization_decoder = None
+        self.toobject = None
 
     def findotype(self, value):
         if isinstance(value, int):
@@ -371,7 +372,9 @@ class OCodec(object):
         return time*milliseconds_per_day+local_timezone_offset, rest
 
     def readembedded(self, data):
-        return self.serialization_decoder(data)
+        record, class_name, rest = self.serialization_decoder(data)
+        instance = self.toobject(class_name, record)
+        return instance, rest
 
     def readbinary(self, data):
         length, rest = self.readvarint(data)

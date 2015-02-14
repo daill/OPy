@@ -123,6 +123,7 @@ class OBinarySerializer(OSerializer):
         self.__codec = OCodec()
         self.__codec.serialization_decoder = self.decode
         self.__codec.serialization_encoder = self.encode
+        self.__codec.toobject = self.toobject
 
     def encode(self, data:BaseVertex):
         if data:
@@ -232,7 +233,7 @@ class OBinarySerializer(OSerializer):
 
                     record[bytes.decode(field_name, 'utf-8')] = value
 
-        return record, class_name
+        return record, class_name, rest
 
 class OCSVSerializer(OSerializer):
     def __init__(self):
