@@ -12,14 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from test.model.o_db_test_obj import TestObject
+from client import BaseVertex
 
 __author__ = 'daill'
 
+
+class TestObject(BaseVertex):
+    def __init__(self):
+        pass
+
 class TestCoordinates(TestObject):
-    def __init__(self, lat, lng):
-        self.lat = lat
-        self.lng = lng
+    def __init__(self):
+        self.lat = None
+        self.lng = None
 
     def persistent_attributes(self):
         return ['lat', 'lng']
+
+
+class TestCity(TestObject):
+    def __init__(self):
+        self.name = None
+
+    def persistent_attributes(self):
+        return ['name']
+
+
+class TestLocation(TestObject):
+    def __init__(self):
+        self.name = None
+        self.city = None
+        self.coordinates = None
+
+    def persistent_attributes(self):
+        return ['name', 'city', 'coordinates']
+
+

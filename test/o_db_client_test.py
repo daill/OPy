@@ -16,7 +16,7 @@ import unittest
 from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert
 from test.model.o_db_test_coordinates import TestCoordinates
 from test.model.o_db_test_location import TestLocation
-from test.model.o_db_test_obj import TestObject
+from test.model.o_db_test_model import TestObject, TestLocation, TestCoordinates
 
 __author__ = 'daill'
 

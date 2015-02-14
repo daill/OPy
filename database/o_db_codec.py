@@ -31,8 +31,8 @@ __author__ = 'daill'
 class OCodec(object):
     def __init__(self):
         self.position = 0
-        self.encode = None
-        self.decode = None
+        self.serialization_encoder = None
+        self.serialization_decoder = None
 
     def findotype(self, value):
         if isinstance(value, int):
@@ -52,6 +52,8 @@ class OCodec(object):
             return OBinaryType.EMBEDDEDLIST
         elif isinstance(value, dict):
             return OBinaryType.EMBEDDEDMAP
+        elif isinstance(value, BaseVertex):
+            return OBinaryType.EMBEDDED
         else:
             raise TypeNotFoundException("type '{}' of value '{}' has no corresponding OBinaryType".format(type(value), value))
 
@@ -99,7 +101,7 @@ class OCodec(object):
     def writeembedded(self, value):
         if isinstance(value, BaseVertex):
             logging.debug("serialize vertex")
-            self.encode(value)
+            return self.serialization_encoder(value)
         else:
             # edge
             logging.debug("serialize edge")
@@ -227,8 +229,7 @@ class OCodec(object):
             if value == '-1' or value == -1 and type == OProfileType.STRING:
                 return self.writeint(-1)
             elif isinstance(value, str):
-                length = len(value)
-                return self.writestring(length, value)
+                return self.writestring(value)
             else:
                 raise WrongTypeException("wrong value type for '{}' type".format(type))
         elif type == OProfileType.RECORDS:
@@ -239,8 +240,7 @@ class OCodec(object):
                 bytes = ''
                 bytes += self.writeint(len(value))
                 for string in value:
-                    string_length = len(string)
-                    bytes += self.writestring(string_length, string)
+                    bytes += self.writestring(string)
                 return bytes
             else:
                 raise WrongTypeException("wrong value type for '{}' type".format(type))
@@ -371,7 +371,7 @@ class OCodec(object):
         return time*milliseconds_per_day+local_timezone_offset, rest
 
     def readembedded(self, data):
-        return self.decode(data)
+        return self.serialization_decoder(data)
 
     def readbinary(self, data):
         length, rest = self.readvarint(data)
@@ -539,7 +539,7 @@ class OCodec(object):
     def writevalue(self, type, value):
         otype = OBinaryType(type)
 
-        if otype == OBinaryType.INTEGER or otype == OBinaryType.LONG or OBinaryType.SHORT:
+        if otype == OBinaryType.INTEGER or otype == OBinaryType.LONG or otype == OBinaryType.SHORT:
             return self.writevarint(value)
         elif otype == OBinaryType.STRING:
             return self.writevarintstring(value)

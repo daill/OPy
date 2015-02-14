@@ -31,6 +31,17 @@ __author__ = 'daill'
 class OSerializer(object):
     entities = None
 
+    def __init__(self):
+        self.entities = dict()
+        self.createentitydict(BaseVertex)
+
+    # build entity dict
+    def createentitydict(self, base_class):
+        subclasses = base_class.__subclasses__()
+        for clazz in subclasses:
+            self.entities[clazz.__name__] = clazz.__module__
+            self.createentitydict(clazz)
+
     def encode(self, data):
         raise NotImplementedError("You have to implement the encode method")
 
@@ -108,38 +119,65 @@ class OBinarySerializer(OSerializer):
 
     """
     def __init__(self):
+        super().__init__()
         self.__codec = OCodec()
+        self.__codec.serialization_decoder = self.decode
+        self.__codec.serialization_encoder = self.encode
 
     def encode(self, data:BaseVertex):
         if data:
-            result = b''
+            result_head = b''
             logging.debug("start binary serializing data: {}".format(data))
 
             # write version
-            result += self.__codec.writebyte(0)
+            result_head += self.__codec.writebyte(0)
 
             # write class name
             class_name = data.__class__.__name__
-            result += self.__codec.writestring(class_name)
+            result_head += self.__codec.writevarintstring(class_name)
+
+            result_values = b''
 
             fields = data.persistent_attributes()
-            value_bytes = b''
-            value_pos = 0
+            temp_header_bytes = dict()
+            temp_value_bytes = dict()
+            temp_type_bytes = dict()
+            byte_count = len(result_head)
 
             for field in fields:
                 if hasattr(data, field):
                     value = getattr(data, field)
                     # check if the field is another vertex
-                    try:
-                        type = self.__codec.findotype(value)
-                        value_bytes += self.__codec.writevalue(type, value)
+                    if value:
+                        try:
+                            temp_header_bytes[field] = (self.__codec.writevarintstring(field))
+                            type = self.__codec.findotype(value)
+                            temp_type_bytes[field] = (self.__codec.writeotype(type))
 
-                    except TypeNotFoundException as err:
-                        logging.error(err)
+                            # byte length of key string, type and position
+                            byte_count += len(temp_header_bytes[field]) + len(temp_type_bytes[field]) + 4
 
+                            temp_value_bytes[field] = (self.__codec.writevalue(type, value))
+
+                        except TypeNotFoundException as err:
+                            logging.error(err)
 
                 else:
                     logging.info("class '{}' has no attribute with name '{}'".format(class_name, field))
+
+            # concat the bytes to fit the right order
+            for field in fields:
+                if field in temp_header_bytes:
+                    result_head += temp_header_bytes[field]
+                    # position of the data
+                    result_head += self.__codec.writeint(byte_count)
+                    result_head += temp_type_bytes[field]
+
+                    result_values += temp_value_bytes[field]
+                    byte_count += len(temp_value_bytes[field])
+
+
+        return result_head + result_values
 
     def decode(self, data):
         if len(data) != 0:
@@ -155,8 +193,14 @@ class OBinarySerializer(OSerializer):
 
             record = dict()
 
+            first_run = True
+            first_pos = None
+
             # read fields and pointers
             while True:
+                if first_pos and self.__codec.position >= first_pos:
+                    break
+
                 length, rest = self.__codec.readvarint(rest)
                 if length == 0:
                     break
@@ -165,6 +209,12 @@ class OBinarySerializer(OSerializer):
                     field_name, rest = self.__codec.readbytes(length, rest)
                     pos, rest = self.__codec.readint(rest)
                     type, rest = self.__codec.readbyte(rest)
+
+                    if first_run:
+                        first_pos = pos
+                        first_run = False
+
+
                 else:
                     # TODO: Implement schema retrieval
                     # decode global property
@@ -186,6 +236,7 @@ class OBinarySerializer(OSerializer):
 
 class OCSVSerializer(OSerializer):
     def __init__(self):
+        super().__init__()
         pass
 
     def encode(self, data):
@@ -230,7 +281,7 @@ class OCSVSerializer(OSerializer):
 
 
                         parser = OCodec()
-                        data_dict = parser.decode(ORidBagDocument(ORidBagType.EMBEEDED), base64_binary)
+                        data_dict = parser.serialization_decoder(ORidBagDocument(ORidBagType.EMBEEDED), base64_binary)
 
                         logging.debug("decoded base64: " + str(base64_binary))
 

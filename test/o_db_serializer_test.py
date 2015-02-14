@@ -15,6 +15,8 @@
 import unittest
 from common.o_db_model import OVarInteger
 from database.o_db_codec import OCodec
+from database.o_db_serializer import OBinarySerializer
+from test.model.o_db_test_model import TestCity, TestLocation
 
 __author__ = 'daill'
 
@@ -62,6 +64,34 @@ class ODBSerializerTests(unittest.TestCase):
         bytes = codec.writeembeddedmap(values)
         result = codec.readembeddedmap(bytes)
         self.assertEqual(values, result[0])
+
+    def test_simple_binary_serialization(self):
+
+        city = TestCity()
+        city.name = "Kassel"
+        serializer = OBinarySerializer()
+
+        bytes = serializer.encode(city)
+
+        record, name = serializer.decode(bytes)
+        result_city = serializer.toobject(name, record)
+
+        self.assertEquals(city.__class__, result_city.__class__)
+        self.assertEquals(city.name, result_city.name)
+
+    def test_advanced_binary_serialization(self):
+        city = TestCity()
+        city.name = "Kassel"
+
+        location = TestLocation()
+        location.city = city
+
+        serializer = OBinarySerializer()
+
+        bytes = serializer.encode(location)
+
+        record, name = serializer.decode(bytes)
+        result_location = serializer.toobject(name, record)
 
 
 if __name__ == "__main__":
