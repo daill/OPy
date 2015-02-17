@@ -226,20 +226,20 @@ class Select(QueryType):
         [LOCK default|record]
         [PARALLEL]
     """
-    def __init__(self, clazz:BaseEntity, projections:list=None, *elements:QueryElement):
+    def __init__(self, clazz:BaseEntity, props:list=None, *elements:QueryElement):
         self.__elements = elements
         self.__query_dict = dict()
         self.__clazz = clazz
         self.__clazz_name = getattr(clazz,'__name__')
         self.__prefix = None
         self.__query_rule_index = ["Let", "Where", "GroupBy", "OrderBy", "Skip", "Limit", "Fetchplan", "Timeout", "Lock", "Parallel"]
-        self.__projections = projections
+        self.__props = props
 
     def parse(self):
         query_string = io.StringIO()
         query_string.write("select ")
-        if len(self.__projections) > 0:
-            for projection in self.projections:
+        if len(self.__props) > 0:
+            for projection in self.__props:
                 query_string.write(projection)
                 query_string.write(" ")
         query_string.write("from ")

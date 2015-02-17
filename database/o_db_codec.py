@@ -18,7 +18,7 @@ import logging
 import struct
 from client.o_db_base import BaseVertex
 from common.o_db_exceptions import WrongTypeException, NotConnectedException, SerializationException, \
-    TypeNotFoundException
+    TypeNotFoundException, OPyException
 from common.o_db_model import ORidBagBinary, OVarInteger
 from database.o_db_constants import OProfileType, OConst, OBinaryType
 from database.o_db_profile_parser import OCondition
@@ -312,23 +312,30 @@ class OCodec(object):
         # handle error
         if status == OConst.ERROR and not isinstance(operation, OOperationError):
             error_operation = OOperationError()
+            error_operation.token_based = operation.token_based
             data_dict, status = error_operation.decode(self.unpackdata, data)
             logging.debug("error data: %s", data_dict)
-            raise NotConnectedException("connection not established", data_dict)
+            raise OPyException("exception occured", data_dict)
 
         return data_dict
 
     def readvarint(self, data):
         pos, varint = OVarInteger().decode(data)
-        rest = data[pos:]
-        self.position += len(data)-len(rest)
-        return varint, rest
+        if pos != 0:
+            rest = data[pos:]
+            self.position += len(data)-len(rest)
+            return varint, rest
+        else:
+            return None, data
 
     def readvarintstring(self, data):
         length, rest = self.readvarint(data)
-        value, rest = struct.unpack('>{}s'.format(length), rest[:length])[0], rest[length:]
-        self.position += length
-        return bytes.decode(value, 'utf-8'), rest
+        if length != 0:
+            value, rest = struct.unpack('>{}s'.format(length), rest[:length])[0], rest[length:]
+            self.position += length
+            return bytes.decode(value, 'utf-8'), rest
+        else:
+            return None, rest
 
     def readbyte(self, data):
         self.position+=1

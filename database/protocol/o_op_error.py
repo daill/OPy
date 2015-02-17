@@ -25,7 +25,7 @@ class OOperationError(OOperation):
     super().__init__(-1)
 
     self.__request_profile_str = ""
-    self.__response_profile_str = "[{exception}(1)(exception-class:string)(exception-message:string)]*(0)"
+    self.__response_profile_str = "[{exception}(1)(exception-class:string)(exception-message:string)]*(0)(serialized-exception:bytes)"
 
     self.__request_profile = None
     self.__response_profile = None

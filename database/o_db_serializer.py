@@ -124,6 +124,7 @@ class OBinarySerializer(OSerializer):
         self.__codec.serialization_decoder = self.decode
         self.__codec.serialization_encoder = self.encode
         self.__codec.toobject = self.toobject
+        self.class_name = None
 
     def encode(self, data:BaseVertex):
         if data:
@@ -181,59 +182,62 @@ class OBinarySerializer(OSerializer):
         return result_head + result_values
 
     def decode(self, data):
-        if len(data) != 0:
-            logging.debug("start binary deserializing bytes: {}".format(data))
+        try:
+            if len(data) != 0:
+                logging.debug("start binary deserializing bytes: {}".format(data))
 
-            # start deserializing
-            # first read byte
-            version, rest = self.__codec.readbyte(data)
+                # start deserializing
+                # first read byte
+                version, rest = self.__codec.readbyte(data)
 
-            # read class name
-            class_name, rest = self.__codec.readvarintstring(rest)
-            position_delta = 0
+                # read class name
+                class_name, rest = self.__codec.readvarintstring(rest)
+                position_delta = 0
 
-            record = dict()
+                record = dict()
 
-            first_run = True
-            first_pos = None
+                first_run = True
+                first_pos = None
 
-            # read fields and pointers
-            while True:
-                if first_pos and self.__codec.position >= first_pos:
-                    break
+                # read fields and pointers
+                while True:
+                    if first_pos and self.__codec.position >= first_pos:
+                        break
 
-                length, rest = self.__codec.readvarint(rest)
-                if length == 0:
-                    break
+                    length, rest = self.__codec.readvarint(rest)
+                    if length == 0:
+                        break
 
-                if length > 0:
-                    field_name, rest = self.__codec.readbytes(length, rest)
-                    pos, rest = self.__codec.readint(rest)
-                    type, rest = self.__codec.readbyte(rest)
+                    if length > 0:
+                        field_name, rest = self.__codec.readbytes(length, rest)
+                        pos, rest = self.__codec.readint(rest)
+                        type, rest = self.__codec.readbyte(rest)
 
-                    if first_run:
-                        first_pos = pos
-                        first_run = False
+                        if first_run:
+                            first_pos = pos
+                            first_run = False
 
+                    else:
+                        # TODO: Implement schema retrieval
+                        # decode global property
 
-                else:
-                    # TODO: Implement schema retrieval
-                    # decode global property
-                    logging.info("global property retrieval has not yet been implemented")
-                    pass
+                        logging.info("global property retrieval has not yet been implemented")
+                        pass
 
-                if pos != 0:
-                    actual_position = self.__codec.position
-                    self.__codec.position = 0
+                    if pos != 0:
+                        actual_position = self.__codec.position
+                        self.__codec.position = 0
 
-                    value, temp_rest = self.__codec.readvalue(type, data[pos:])
-                    position_delta += self.__codec.position
+                        value, temp_rest = self.__codec.readvalue(type, data[pos:])
+                        position_delta += self.__codec.position
 
-                    self.__codec.position = actual_position
+                        self.__codec.position = actual_position
 
-                    record[bytes.decode(field_name, 'utf-8')] = value
+                        record[bytes.decode(field_name, 'utf-8')] = value
+            return record, class_name, rest[first_pos:]
+        except Exception as err:
+            logging.error(err)
 
-        return record, class_name, rest
 
 class OCSVSerializer(OSerializer):
     def __init__(self):

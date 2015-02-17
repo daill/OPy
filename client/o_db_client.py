@@ -24,7 +24,7 @@ from database.o_db_connection import OConnection
 from database.o_db_constants import ODBType, OModeChar, OCommandClass, ORidBagType, OSerialization
 from database.o_db_driverconfig import ODriverConfig
 from database.o_db_serializer import OCSVSerializer, OBinarySerializer
-from common.o_db_model import ORidBagDocument, OSQLCommand
+from common.o_db_model import ORidBagDocument, OSQLCommand, ORidBagBinary
 from database.o_db_ops import ODB
 
 
@@ -65,6 +65,48 @@ class OClient(object):
         self.createentitydict(OClient.baseclass)
 
         pass
+
+    def toobject(self, class_name, data):
+        """
+        Method to construct an object with the help of the given data dict. One field must have the key 'class-name' to determine
+        the correct class to load.
+        :param data:
+        :return:
+        """
+
+        try:
+            if class_name in self.entities:
+                instance = self.getinstance(class_name)
+
+                in_edges = dict()
+                out_edges = dict()
+
+                for field_name in data:
+                    field_value = data[field_name]
+                    if isinstance(field_value, ORidBagBinary):
+                        if field_name.startswith("out_"):
+                            if hasattr(instance, 'out_edges'):
+                                out_edges[field_name[4:]] = field_value
+                        else:
+                            if hasattr(instance, 'in_edges'):
+                                in_edges[field_name[3:]] = field_value
+                    else:
+                        if hasattr(instance, field_name):
+                            setattr(instance, field_name, field_value)
+                        else:
+                            raise SerializationException("instance of class '{}' has no attribute with the name '{}'".format(class_name, field_name))
+
+                    logging.debug("parse field {} with value {}".format(field_name, field_value))
+
+                instance.in_edges = in_edges
+                instance.out_edges = out_edges
+
+                return instance
+            else:
+                raise SerializationException("there is no class with name '{}'".format(class_name))
+
+        except Exception as err:
+            logging.error(err)
 
 
     def add_record(self):
@@ -185,30 +227,31 @@ class OClient(object):
                 # execute command
                 command = OSQLCommand(result_query, non_text_limit=-1, fetchplan="", serialized_params="")
                 response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
-                print(response_data)
+                logging.debug("response data '{}'".format(response_data))
 
                 # steps to extract data from response
                 # TODO: sync vs. asynch
-                if "success_status" in response_data:
-                    status = response_data.get("success_status")
-                    if status == 0:
-                        # next to an exception there are various reasons for success or a failure, so we
-                        # we have to check the status
-                        if "result" in response_data:
-                            logging.debug("parse synch response result for adding edge")
-                            result_data = response_data.get("result")
-                            for records_data in result_data:
-                                if "records" in records_data:
-                                    for record in records_data.get("records"):
-                                        if "cluster-id" in record and "cluster-position" in record:
-                                            persistent_object.cluster = record.get("cluster-id")
-                                            persistent_object.position = record.get("cluster-position")
-                                            persistent_object.version = record.get("record-version")
-                                        else:
-                                            logging.error("no cluster information available")
-                                            # possibly raise an exception
-                        if "asynch-result-type" in response_data:
-                            logging.info("cannot handle asynch response, yet")
+                if response_data:
+                    if "success_status" in response_data:
+                        status = response_data.get("success_status")
+                        if status == 0:
+                            # next to an exception there are various reasons for success or a failure, so we
+                            # we have to check the status
+                            if "result" in response_data:
+                                logging.debug("parse synch response result for adding edge")
+                                result_data = response_data.get("result")
+                                for records_data in result_data:
+                                    if "records" in records_data:
+                                        for record in records_data.get("records"):
+                                            if "cluster-id" in record and "cluster-position" in record:
+                                                persistent_object.cluster = record.get("cluster-id")
+                                                persistent_object.position = record.get("cluster-position")
+                                                persistent_object.version = record.get("record-version")
+                                            else:
+                                                logging.error("no cluster information available")
+                                                # possibly raise an exception
+                            if "asynch-result-type" in response_data:
+                                logging.info("cannot handle asynch response, yet")
             except Exception as err:
                 logging.error(err)
 
@@ -318,7 +361,10 @@ class OClient(object):
             serializer.entities = self.entities
 
             # get the deserialized data
-            data, class_name = serializer.decode(record_content)
+            data, class_name, rest = serializer.decode(record_content)
+
+            if not class_name:
+                class_name = clazz.__name__
 
             parsedobject = serializer.toobject(class_name, data)
 
