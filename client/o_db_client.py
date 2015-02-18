@@ -183,33 +183,34 @@ class OClient(object):
             # execute command
             command = OSQLCommand(result_query, non_text_limit=-1, fetchplan="", serialized_params="")
             response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+            logging.debug("response data '{}'".format(response_data))
 
             # steps to extract data from response
             # TODO: sync vs. asynch
-            if "success_status" in response_data:
-                status = response_data.get("success_status")
-                if status == 0:
-                    # next to an exception there are various reasons for success or a failure, so we
-                    # we have to check the status
-                    if "result" in response_data:
-                        logging.debug("parse synch response result for adding vertex")
-                        result_data = response_data.get("result")
-                        for records_data in result_data:
-                            if "records" in records_data:
-                                for record in records_data.get("records"):
-                                    if "cluster-id" in record and "cluster-position" in record:
-                                        persistent_object.cluster = record.get("cluster-id")
-                                        persistent_object.position = record.get("cluster-position")
-                                        persistent_object.version = record.get("record-version")
-                                    else:
-                                        logging.error("no cluster information available")
-                                        # possibly raise an exception
-                    if "asynch-result-type" in response_data:
-                        logging.info("cannot handle asynch response, yet")
-            else:
-                logging.info("adding vertex was not successful")
+            if response_data:
+                if "success_status" in response_data:
+                    status = response_data.get("success_status")
+                    if status == 0:
+                        # next to an exception there are various reasons for success or a failure, so we
+                        # we have to check the status
+                        if "result" in response_data:
+                            logging.debug("parse synch response result for adding vertex")
+                            result_data = response_data.get("result")
+                            for records_data in result_data:
+                                if "records" in records_data:
+                                    for record in records_data.get("records"):
+                                        if "cluster-id" in record and "cluster-position" in record:
+                                            persistent_object.setRID(record.get("cluster-id"), record.get("cluster-position"))
+                                            persistent_object.version = record.get("record-version")
+                                        else:
+                                            logging.error("no cluster information available")
+                                            # possibly raise an exception
+                        if "asynch-result-type" in response_data:
+                            logging.info("cannot handle asynch response, yet")
+                else:
+                    logging.info("adding vertex was not successful")
 
-            return persistent_object
+                return persistent_object
         elif isinstance(query_type, Class):
             try:
                 query_string = query_type.parse()
@@ -244,8 +245,7 @@ class OClient(object):
                                     if "records" in records_data:
                                         for record in records_data.get("records"):
                                             if "cluster-id" in record and "cluster-position" in record:
-                                                persistent_object.cluster = record.get("cluster-id")
-                                                persistent_object.position = record.get("cluster-position")
+                                                persistent_object.setRID(record.get("cluster-id"), record.get("cluster-position"))
                                                 persistent_object.version = record.get("record-version")
                                             else:
                                                 logging.error("no cluster information available")
