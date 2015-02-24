@@ -98,7 +98,6 @@ class OConst(Enum):
     EXCEPTION_MESSAGE = "exception-message"
     EXCEPTION_CLASS = "exception-class"
 
-
 class OProfileType(Enum):
     BOOLEAN = "boolean"
     BYTE = "byte"

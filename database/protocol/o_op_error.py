@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import operator
-from database.o_db_constants import OConst, OProfileType
+
+from common.o_db_constants import OConst, OProfileType
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup, OCondition
 from database.protocol.o_op import OOperation
+
 
 __author__ = 'daill'
 

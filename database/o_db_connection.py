@@ -21,7 +21,7 @@ import select
 
 from common.o_db_exceptions import NotConnectedException
 from database.o_db_codec import OCodec
-from database.o_db_constants import OOperationType
+from common.o_db_constants import OOperationType
 from database.protocol.o_op import OOperation
 from database.protocol.o_op_connect import OOperationConnect
 from database.protocol.o_op_db import OOperationDBClose, OOperationDBOpen

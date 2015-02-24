@@ -13,18 +13,14 @@
 # limitations under the License.
 
 import logging
-import inspect
-import binascii
-
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
-from client.o_db_set import Select, Class, QueryType, Vertex, Edge
+from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop
 from common.o_db_exceptions import OPyClientException, SerializationException
-from database.o_db_codec import OCodec
 from database.o_db_connection import OConnection
-from database.o_db_constants import ODBType, OModeChar, OCommandClass, ORidBagType, OSerialization
+from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
 from database.o_db_driverconfig import ODriverConfig
 from database.o_db_serializer import OCSVSerializer, OBinarySerializer
-from common.o_db_model import ORidBagDocument, OSQLCommand, ORidBagBinary
+from common.o_db_model import OSQLCommand, ORidBagBinary
 from database.o_db_ops import ODB
 
 
@@ -109,7 +105,7 @@ class OClient(object):
             logging.error(err)
 
 
-    def add_record(self):
+    def addrecord(self):
         pass
 
     def save(self, obj:object):
@@ -130,31 +126,31 @@ class OClient(object):
             print(e)
 
 
-    def add_vertex(self, p_object:BaseVertex):
+    def addvertex(self, p_object:BaseVertex):
         pass
 
-    def del_vertex(self):
+    def delvertex(self):
         """
         Deletes a vertex
         """
         pass
 
-    def createedge(self, object:BaseEdge):
+    def createedge(self, object:Edge):
         """
         Creates a simple edge between two vertices.
         """
         try:
-            self.create(Edge(object))
+            self.create(object)
         except Exception as err:
             logging.error(err)
 
-    def createvertex(self, object:BaseVertex):
+    def createvertex(self, object:Vertex):
         """
         Wrapper method to iterate through the whole object tree and add it to the database
         """
         try:
             # add object to database to get a rid
-            object = self.create(Vertex(object))
+            object = self.create(object)
 
             # get all outgoing edges
             edges = object.getoutedges()
@@ -166,7 +162,7 @@ class OClient(object):
                     out_vertex = edge.out_vertex
 
                     # recursive call
-                    self.createvertex(out_vertex)
+                    self.createvertex(Vertex(out_vertex))
 
                     #  outvertex should now own a rid, so we can persist an edge
                     edge = self.create(Edge(edge))
@@ -174,6 +170,33 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
+    def do(self, query_action:QueryType):
+        if not query_action:
+            raise OPyClientException("you have to specify a query")
+
+        if isinstance(query_action, Select):
+            return self.fetch(query_action)
+        elif isinstance(query_action, Update):
+            return self.update(query_action)
+        elif isinstance(query_action, Create):
+            type = query_action.type
+            if isinstance(type, Vertex):
+                return self.createvertex(type)
+            elif isinstance(type, Edge):
+                return self.createedge(type)
+            elif isinstance(type, Class):
+                raise OPyClientException("class has not been implemeneted yet")
+            else:
+                raise OPyClientException("don't know how to handel tpye '{}'".format(str(type)))
+
+        elif isinstance(query_action, Drop):
+            pass
+        else:
+            raise OPyClientException("i don't know what to do")
+
+
+    def update(self, query_type:QueryType):
+        pass
 
     def create(self, query_type:QueryType):
         if isinstance(query_type, Vertex):
@@ -256,13 +279,13 @@ class OClient(object):
                 logging.error(err)
 
 
-    def add_edge(self):
+    def addedge(self):
         """
         Creates an edge of the given type from one vertex to another
         """
         pass
 
-    def del_edge(self):
+    def deledge(self):
         """
         Deletes an edge between two vertices
         """
@@ -307,16 +330,18 @@ class OClient(object):
 
                                                     parsedobject = self.parse_object(record_content=record.get("record-content"), clazz=clazz)
 
-                                                    # parsedobject.setRID(clusterid, clusterposition)
-                                                    # parsedobject.version = version
-                                                    #
-                                                    # if firstrun and isinstance(parsedobject, clazz):
-                                                    #     firstrun = False
-                                                    #     returningobject = parsedobject
-                                                    #
-                                                    # fetchedobjects[parsedobject.getRID()] = parsedobject
-                                                    #
-                                                    # logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
+                                                    parsedobject.setRID(clusterid, clusterposition)
+                                                    parsedobject.version = version
+
+                                                    if firstrun and isinstance(parsedobject, clazz):
+                                                        firstrun = False
+                                                        returningobject = parsedobject
+
+
+                                                    fetchedobjects[parsedobject.getRID()] = parsedobject
+
+                                                    logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
+
 
                                                 except SerializationException as err:
                                                         logging.error(err)
@@ -324,14 +349,32 @@ class OClient(object):
                                             else:
                                                 logging.error("no cluster information available")
                                                 # possibly raise an exception
-
-
                             if "asynch-result-type" in result_data:
                                 logging.info("cannot handle asynch response, yet")
                     else:
                         logging.info("no data fetched")
 
-                return result_data
+                # now set the correct references based of the fetched objects
+                for rid in fetchedobjects:
+                    # note that only embedded document don't own a RID therefore we only need to check the edges
+                    object = fetchedobjects[rid]
+                    edge_dict = object.out_edges
+
+                    for edge_dict_key in edge_dict:
+                        for edge in edge_dict[edge_dict_key]:
+                            edge_rid = edge.getRID()
+                            if edge_rid in fetchedobjects:
+                                edge.out_vertex = fetchedobjects[edge_rid]
+
+                    edge_dict = object.in_edges
+
+                    for edge_dict_key in edge_dict:
+                        for edge in edge_dict[edge_dict_key]:
+                            edge_rid = edge.getRID()
+                            if edge_rid in fetchedobjects:
+                                edge.in_vertex = fetchedobjects[edge_rid]
+
+                return returningobject
             else:
                 return None
         except Exception as err:

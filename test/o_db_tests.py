@@ -15,7 +15,7 @@
 import unittest
 
 from database.o_db_connection import OConnection
-from database.o_db_constants import ODBType, OModeChar, OCommandClass, OModeInt, ORecordType
+from common.o_db_constants import ODBType, OModeChar, OCommandClass, OModeInt, ORecordType
 from common.o_db_model import OSQLCommand
 from database.o_db_ops import ODB
 

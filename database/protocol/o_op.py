@@ -15,7 +15,7 @@
 import logging
 
 from common.o_db_exceptions import ProfileNotMatchException
-from database.o_db_constants import OConst, OOperationType
+from common.o_db_constants import OConst, OOperationType
 from database.o_db_profile_parser import OElement, OGroup
 
 

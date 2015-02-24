@@ -38,7 +38,7 @@ class BaseVertex(BaseEntity):
     """
     def __init__(self):
         super().__init__()
-        self.in_edges = None
+        self.__in_edges = None
         self.__out_edges = None
 
     def persistent_attributes(self):
@@ -55,12 +55,27 @@ class BaseVertex(BaseEntity):
     def setoutedges(self, edges: dict):
         self.__out_edges = edges
 
-        for edge in self.__out_edges.values():
-            edge.in_vertex = self
+        for edge_list in self.__out_edges.values():
+            for edge in edge_list:
+                edge.in_vertex = self
+
+        return self.__out_edges
+
+    def getinedges(self):
+        return self.__in_edges
+
+
+    def setinedges(self, edges: dict):
+        self.__in_edges = edges
+
+        for edge_list in self.__in_edges.values():
+            for edge in edge_list:
+                edge.out_vertex = self
 
         return self.__out_edges
 
     out_edges = property(getoutedges, setoutedges)
+    in_edges = property(getinedges, setinedges)
 
     def getrid(self):
         return '#{}:{}'.format(self.clusterid, self.clusterposition  )

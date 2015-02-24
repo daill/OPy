@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from database.o_db_constants import OOperationType
+from common.o_db_constants import OOperationType
 from database.protocol.o_op import OOperation
 
 __author__ = 'daill'

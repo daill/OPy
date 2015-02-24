@@ -14,7 +14,9 @@
 
 from enum import Enum
 import string
-from database.o_db_constants import OProfileType
+
+from common.o_db_constants import OProfileType
+
 
 __author__ = 'daill'
 

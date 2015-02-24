@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import unittest
-from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert
-from test.model.o_db_test_coordinates import TestCoordinates
-from test.model.o_db_test_location import TestLocation
+from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert, Update, Set, \
+    Upsert, Create, Vertex
 from test.model.o_db_test_model import TestObject, TestLocation, TestCoordinates
 
 __author__ = 'daill'
@@ -46,10 +45,23 @@ class ODBClientTests(unittest.TestCase):
         query = str(GroupBy("name"))
         self.assertEqual(query, " group by name ")
 
+    def test_create(self):
+        query = str(Create(Vertex(TestLocation)))
+
     def test_insert(self):
-        location = TestCoordinates(5,'4')
+        location = TestCoordinates()
+        location.lat = 5
+        location.lng = '10'
         query = Insert(location).parse()
         self.assertEqual(query, "insert into TestLocation ( lat, lng ) values ('5','4')")
+
+    def test_update(self):
+        # query = Update(TestCoordinates, Set({'a':'5', 'b':6}),()).parse()
+        # self.assertEquals(query, "update TestCoordinates  set b = 6, a = '5'")
+        # query = Update('#12:2', Set({'a':5, 'b':6}),()).parse()
+        # self.assertEquals(query, "update #12:2  set b = 6, a = 5")
+        query = Update(TestCoordinates, Set({'a':'5', 'b':6}),(Upsert())).parse()
+        print(query)
 
 
 if __name__ == "__main__":

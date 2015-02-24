@@ -37,6 +37,10 @@ class QueryElement(object):
     def __str__(self):
         return self._query
 
+class CreateType(QueryType):
+    def __init__(self):
+        pass
+
 class Linkage(QueryElement):
     def __init__(self):
         super().__init__()
@@ -47,10 +51,14 @@ class Delete(QueryType):
         pass
 
 class Create(QueryType):
+    def __init__(self, type:CreateType):
+        self.type = type
+
+class Drop(QueryType):
     def __init__(self):
         pass
 
-class Class(QueryType):
+class Class(CreateType):
     def __init__(self, persistent_class:BaseEntity, class_type:str):
         self.__persistent_class = persistent_class
         self.__class_name = getattr(persistent_class, '__name__')
@@ -71,7 +79,7 @@ class Class(QueryType):
 
         return result_query
 
-class Edge(QueryType):
+class Edge(CreateType):
     """
     CREATE EDGE <class> [CLUSTER <cluster>] FROM <rid>|(<query>)|[<rid>]* TO <rid>|(<query>)|[<rid>]*
                     [SET <field> = <expression>[,]*]|CONTENT {<JSON>}
@@ -110,7 +118,7 @@ class Edge(QueryType):
 
         return result_query
 
-class Vertex(QueryType):
+class Vertex(CreateType):
     """
     Creates a new vertex by using the given class
     """
@@ -301,8 +309,180 @@ class Let(QueryElement):
         return result_string
 
 class Update(QueryType):
-    def __init__(self, object:Class):
+    """
+    Defines the update statement
+
+    UPDATE <class>|cluster:<cluster>|<recordID>
+      [SET|INCREMENT|ADD|REMOVE|PUT <field-name> = <field-value>[,]*]|[CONTENT|MERGE <JSON>]
+      [UPSERT]
+      [RETURN <returning> [<returning-expression>]]
+      [WHERE <conditions>]
+      [LOCK default|record]
+      [LIMIT <max-records>] [TIMEOUT <timeout>]
+    """
+    def __init__(self, object, updateaction, *elements:QueryElement):
+        self.__query_rule_index = ["Upsert", "Return", "Where", "Lock", "Limit"]
+        self.__updateaction = updateaction
+        self.__elements = elements
+        self.__object = object
+
+    def parse(self):
+        self.__query_dict = dict()
+        query_string = io.StringIO()
+        query_string.write("update ")
+        if isinstance(self.__object, str):
+            # its a rid
+            query_string.write(self.__object)
+        else:
+            # its a class
+            query_string.write(self.__object.__name__)
+        query_string.write(" ")
+        query_string.write(str(self.__updateaction))
+
+        for element in self.__elements:
+            self.__query_dict[element.__class__.__name__] = str(element)
+
+        for key in self.__query_rule_index:
+            if key in self.__query_dict:
+                query_string.write(" ")
+                query_string.write(self.__query_dict[key])
+
+        result_string = query_string.getvalue()
+
+        logging.debug("parsed sql string: '{}' from data '{}'".format(result_string, self.__query_dict))
+
+        query_string.close()
+
+        return result_string
+
+
+class Upsert(QueryElement):
+    def __init__(self):
+        super().__init__()
+        self._query = " upsert "
+
+class Lock(QueryElement):
+    def __init__(self, type:str):
+        super().__init__()
+        self._query = " lock {} ".format(type)
+
+    @classmethod
+    def default(cls):
+        return cls("default")
+
+    @classmethod
+    def record(cls):
+        return cls("record")
+
+class Limit(QueryElement):
+    def __init__(self, count:int, timeout:int=None):
+        super().__init__()
+
+        if timeout:
+            self._query = " limit {} timeout {} ".format(count, timeout)
+        else:
+            self._query = " limit {} ".format(count)
+
+    @classmethod
+    def withTimeout(cls, count:int, timeout:int):
+        return cls(count, timeout)
+
+class Return(QueryElement):
+    """
+    RETURN: If a field has been specified, then only this field will be returned
+    otherwise the whole record will be returned
+    """
+    def __init__(self, type:str, field:str=None):
+        super().__init__()
+        if field:
+            self._query = " return {} {}".format(type, field)
+        else:
+            self._query = " return {}".format(type)
+
+    @classmethod
+    def count(cls):
+        return cls("count")
+
+    @classmethod
+    def after(cls, field:str):
+        return cls("after", field)
+
+    @classmethod
+    def before(cls, field:str):
+        return cls("before", field)
+
+class Lock(QueryElement):
+    def __init__(self):
         pass
+
+class Limit(QueryElement):
+    def __init__(self):
+        pass
+
+class UpdateActionElement(QueryElement):
+    def __init__(self, type:str, fields:dict):
+        self.__type = type
+        self.__fields = fields
+
+    def __str__(self):
+        query_string = io.StringIO()
+        query_string.write(" ")
+        query_string.write(self.__type)
+        query_string.write(" ")
+
+        count = 1
+        for field_name in self.__fields:
+            query_string.write(field_name)
+            query_string.write(" = ")
+            if isinstance(self.__fields[field_name], str):
+                query_string.write("'")
+                query_string.write(str(self.__fields[field_name]))
+                query_string.write("'")
+            else:
+                query_string.write(str(self.__fields[field_name]))
+
+            if count < len(self.__fields):
+                query_string.write(", ")
+            count += 1
+
+        result_string = query_string.getvalue()
+        query_string.close()
+
+        return result_string
+
+class Set(UpdateActionElement):
+    def __init__(self, fields:dict):
+        super().__init__("set", fields)
+
+class Increment(UpdateActionElement):
+    def __init__(self, fields:dict):
+        super().__init__("increment", fields)
+
+class Add(UpdateActionElement):
+    def __init__(self, fields:dict):
+        super().__init__("add", fields)
+
+class Remove(UpdateActionElement):
+    def __init__(self, fields:dict):
+        super().__init__("remove", fields)
+
+class Put(UpdateActionElement):
+    def __init__(self, fields:dict):
+        super().__init__("put", fields)
+
+class Content(UpdateActionElement):
+    def __init__(self):
+        pass
+
+class Merge(UpdateActionElement):
+    def __init__(self):
+        pass
+
+
+
+
+
+
 
 class Condition(QueryElement):
     def __init__(self, attribute_name:str):

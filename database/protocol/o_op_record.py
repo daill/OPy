@@ -14,7 +14,7 @@
 
 import logging
 
-from database.o_db_constants import OOperationType, OConst
+from common.o_db_constants import OOperationType, OConst
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
 
@@ -60,10 +60,11 @@ class OOperationRecordUpdate(OOperation):
 
         def processelement(element: OElement):
             nonlocal rest
+            nonlocal data_dict
+            nonlocal count_of_collection_changes
 
             if isinstance(element, OGroup):
                 nonlocal data_dict
-                nonlocal count_of_collection_changes
 
                 # save main state
                 main_dict = data_dict
@@ -84,7 +85,6 @@ class OOperationRecordUpdate(OOperation):
 
                 if element.name == "count-of-collection-changes":
                     # save value as indicator how often the following group will be repeated
-                    nonlocal count_of_collection_changes
                     count_of_collection_changes = value
 
                 # check if its and error
@@ -94,7 +94,6 @@ class OOperationRecordUpdate(OOperation):
                     error_state = True
                     return
 
-                nonlocal data_dict
                 data_dict[element.name] = value
             return rest
 
@@ -185,9 +184,10 @@ class OOperationRecordCreate(OOperation):
 
         def processelement(element: OElement):
             nonlocal rest
+            nonlocal data_dict
+            nonlocal count_of_collection_changes
 
             if isinstance(element, OGroup):
-                nonlocal data_dict
                 nonlocal count_of_collection_changes
 
                 # save main state
@@ -209,7 +209,6 @@ class OOperationRecordCreate(OOperation):
 
                 if element.name == "count-of-collection-changes":
                     # save value as indicator how often the following group will be repeated
-                    nonlocal count_of_collection_changes
                     count_of_collection_changes = value
 
                 # check if its and error
@@ -219,7 +218,7 @@ class OOperationRecordCreate(OOperation):
                     error_state = True
                     return
 
-                nonlocal data_dict
+
                 data_dict[element.name] = value
             return rest
 
@@ -284,9 +283,9 @@ class OOperationRecordLoad(OOperation):
 
         def processelement(element: OElement):
             nonlocal rest
+            nonlocal data_dict
 
             if isinstance(element, OGroup):
-                nonlocal data_dict
 
                 # save main state
                 main_dict = data_dict
@@ -319,7 +318,7 @@ class OOperationRecordLoad(OOperation):
                     error_state = True
                     return
 
-                nonlocal data_dict
+
                 data_dict[element.name] = value
             return rest
 

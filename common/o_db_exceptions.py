@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from database.o_db_constants import OConst
+from common.o_db_constants import OConst
 
 __author__ = 'daill'
 

@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from datetime import datetime
-import inspect
-
 import logging
 import struct
+
 from client.o_db_base import BaseVertex
-from common.o_db_exceptions import WrongTypeException, NotConnectedException, SerializationException, \
-    TypeNotFoundException, OPyException
+from common.o_db_exceptions import WrongTypeException, TypeNotFoundException, OPyException
 from common.o_db_model import ORidBagBinary, OVarInteger
-from database.o_db_constants import OProfileType, OConst, OBinaryType
+from common.o_db_constants import OProfileType, OConst, OBinaryType
 from database.o_db_profile_parser import OCondition
 from database.protocol.o_op import OOperation
 from database.protocol.o_op_error import OOperationError

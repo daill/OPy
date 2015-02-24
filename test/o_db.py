@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from database.o_db_connection import OConnection
-from database.o_db_constants import ODBType
+from common.o_db_constants import ODBType
 from database.o_db_ops import ODB
 
 __author__ = 'daill'

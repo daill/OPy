@@ -13,8 +13,10 @@
 # limitations under the License.
 from io import BytesIO
 import struct
-from database.o_db_constants import ORidBagType, OConst, ORecordType, ORecordKind
+
+from common.o_db_constants import ORidBagType, OConst, ORecordType, ORecordKind
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
+
 
 __author__ = 'daill'
 

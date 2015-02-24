@@ -15,13 +15,11 @@
 import logging
 import inspect
 import binascii
-from logging import info
-import sys
-from client.o_db_base import BaseVertex, BaseEntity
 
+from client.o_db_base import BaseVertex, BaseEdge
 from common.o_db_exceptions import SerializationException, TypeNotFoundException
 from database.o_db_codec import OCodec
-from database.o_db_constants import ORidBagType, ODBType, OBinaryType
+from common.o_db_constants import ORidBagType
 from common.o_db_model import ORidBagDocument, ORidBagBinary
 
 
@@ -77,30 +75,45 @@ class OSerializer(object):
             if class_name in self.entities:
                 instance = self.getinstance(class_name)
 
-                in_edges = dict()
-                out_edges = dict()
+                if isinstance(instance, BaseVertex):
+                    in_edges = dict()
+                    out_edges = dict()
 
-                for field_name in data:
-                    field_value = data[field_name]
-                    if isinstance(field_value, ORidBagBinary):
-                        if field_name.startswith("out_"):
-                            if hasattr(instance, 'out_edges'):
-                                out_edges[field_name[4:]] = field_value
+                    for field_name in data:
+                        field_value = data[field_name]
+                        if isinstance(field_value, ORidBagBinary):
+                            if field_name.startswith("out_"):
+                                if hasattr(instance, 'out_edges'):
+                                    out_edges[field_name[4:]] = self.toobject(field_name[4:], field_value)
+                            else:
+                                if hasattr(instance, 'in_edges'):
+                                    in_edges[field_name[3:]] = self.toobject(field_name[3:], field_value)
                         else:
-                            if hasattr(instance, 'in_edges'):
-                                in_edges[field_name[3:]] = field_value
-                    else:
-                        if hasattr(instance, field_name):
-                            setattr(instance, field_name, field_value)
-                        else:
-                            raise SerializationException("instance of class '{}' has no attribute with the name '{}'".format(class_name, field_name))
+                            if hasattr(instance, field_name):
+                                setattr(instance, field_name, field_value)
+                            else:
+                                raise SerializationException("instance of class '{}' has no attribute with the name '{}'".format(class_name, field_name))
 
-                    logging.debug("parse field {} with value {}".format(field_name, field_value))
+                        logging.debug("parse field {} with value {}".format(field_name, field_value))
 
-                instance.in_edges = in_edges
-                instance.out_edges = out_edges
+                    instance.in_edges = in_edges
+                    instance.out_edges = out_edges
 
-                return instance
+                    return instance
+                elif isinstance(instance, BaseEdge):
+                    edge_list = list()
+                    if isinstance(data, ORidBagBinary):
+                        itr = iter(data.entries)
+                        while True:
+                            try:
+                                rid_tuple = itr.__next__()
+                                edge_list.append(instance)
+                                instance.setRID(rid_tuple[0], rid_tuple[1])
+                                instance = self.getinstance(class_name)
+                            except StopIteration:
+                                break
+                    return edge_list
+
             else:
                 raise SerializationException("there is no class with name '{}'".format(class_name))
 

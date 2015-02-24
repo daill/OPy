@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import logging
-from database.o_db_constants import OOperationType, OConst
+
+from common.o_db_constants import OOperationType, OConst
 from database.o_db_profile_parser import OProfileParser, OElement, OGroup
 from database.protocol.o_op import OOperation
+
 
 __author__ = 'daill'
 

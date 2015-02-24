@@ -15,8 +15,7 @@
 import logging
 
 from database.o_db_connection import OConnection
-from database.o_db_constants import OStorageTypes, ODBType, OModeInt, ORecordType, OModeChar, OCommandClass, \
-    OSerialization
+from common.o_db_constants import OStorageTypes, ODBType, OModeInt, ORecordType, OModeChar, OCommandClass
 from database.o_db_driverconfig import ODriverConfig
 from database.protocol.o_op_connect import OOperationConnect
 from database.protocol.o_op_db import OOperationDBClose, OOperationDBCreate, OOperationDBExist, OOperationDBList, \
