@@ -1,10 +1,9 @@
 # OPy
 
-
 This is an alternative Python 3 OrientDB driver implementation based on the latest release of OrientDB. Currently its supporting binary protocol version 28 of OrientDB version 2.0. It's still under development and written with the aim to provide an object mapping for the graph database part of OrientDB. More information about the usage will follow as soon as possible.
 
 ## Structure
-This tool splits into two parts:
+This lib splits into two parts:
 
 *	database: contains all the necessary objects and functions for the binary communication with the OrientDB server
 *	client: (not yet ready) contains all the code to provide an object mapping to the graph and vice versa
@@ -36,6 +35,10 @@ The basic usage structur is as follows:
 	    # close connection
 	    odb.dbclose(connection)
 	    
+## Do Stuff
+
+* Create class
+	    
 ## Notes
 On serializing a list auf records you have to make sure, that these records have been already written to the database. So its mandantory that theres a rid assigned to each object in the list.
 	    
@@ -58,10 +61,16 @@ On serializing a list auf records you have to make sure, that these records have
 * REQUEST_DB_RELOAD
 
 ## Not implemented
+
 * REQUEST_DATACLUSTER_ADD
 * REQUEST_DATACLUSTER_DROP	
 * REQUEST_DATACLUSTER_COUNT
 * REQUEST_DATACLUSTER_DATARANGE
+
+# Query language
+
+### Update
+|[CONTENT|MERGE <JSON>] not implemented
 
 
 
