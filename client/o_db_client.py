@@ -305,7 +305,7 @@ class OClient(object):
 
                 # resulting objects list
                 fetchedobjects = dict()
-                returningobject = None
+                returningobject = dict()
                 firstrun = True
 
                 if issubclass(clazz, BaseEntity):
@@ -328,20 +328,19 @@ class OClient(object):
                                                     clusterposition = record.get("cluster-position")
                                                     version = record.get("record-version")
 
-                                                    parsedobject = self.parse_object(record_content=record.get("record-content"), clazz=clazz)
+                                                    if '#{}:{}'.format(clusterid, clusterposition) not in returningobject:
 
-                                                    parsedobject.setRID(clusterid, clusterposition)
-                                                    parsedobject.version = version
+                                                        parsedobject = self.parse_object(record_content=record.get("record-content"), clazz=clazz)
 
-                                                    if firstrun and isinstance(parsedobject, clazz):
-                                                        firstrun = False
-                                                        returningobject = parsedobject
+                                                        parsedobject.setRID(clusterid, clusterposition)
+                                                        parsedobject.version = version
 
+                                                        if isinstance(parsedobject, clazz):
+                                                            returningobject[parsedobject.getRID()] = parsedobject
 
-                                                    fetchedobjects[parsedobject.getRID()] = parsedobject
+                                                        fetchedobjects[parsedobject.getRID()] = parsedobject
 
-                                                    logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
-
+                                                        logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
 
                                                 except SerializationException as err:
                                                         logging.error(err)
@@ -358,21 +357,25 @@ class OClient(object):
                 for rid in fetchedobjects:
                     # note that only embedded document don't own a RID therefore we only need to check the edges
                     object = fetchedobjects[rid]
-                    edge_dict = object.out_edges
 
-                    for edge_dict_key in edge_dict:
-                        for edge in edge_dict[edge_dict_key]:
-                            edge_rid = edge.getRID()
-                            if edge_rid in fetchedobjects:
-                                edge.out_vertex = fetchedobjects[edge_rid]
+                    if isinstance(object, BaseVertex):
+                        edge_dict = object.out_edges
 
-                    edge_dict = object.in_edges
+                        for edge_dict_key in edge_dict:
+                            for edge in edge_dict[edge_dict_key]:
+                                edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
+                                if edge_rid in fetchedobjects:
+                                    edge.out_vertex = fetchedobjects[edge_rid]
 
-                    for edge_dict_key in edge_dict:
-                        for edge in edge_dict[edge_dict_key]:
-                            edge_rid = edge.getRID()
-                            if edge_rid in fetchedobjects:
-                                edge.in_vertex = fetchedobjects[edge_rid]
+                        edge_dict = object.in_edges
+
+                        for edge_dict_key in edge_dict:
+                            for edge in edge_dict[edge_dict_key]:
+                                edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
+                                if edge_rid in fetchedobjects:
+                                    edge.in_vertex = fetchedobjects[edge_rid]
+                    elif isinstance(object, BaseEdge):
+                        pass
 
                 return returningobject
             else:

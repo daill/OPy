@@ -101,19 +101,21 @@ class OSerializer(object):
 
                     return instance
                 elif isinstance(instance, BaseEdge):
-                    edge_list = list()
                     if isinstance(data, ORidBagBinary):
+                        edge_list = list()
                         itr = iter(data.entries)
                         while True:
                             try:
                                 rid_tuple = itr.__next__()
                                 edge_list.append(instance)
-                                instance.setRID(rid_tuple[0], rid_tuple[1])
+                                instance.tmp_rid = rid_tuple
                                 instance = self.getinstance(class_name)
                             except StopIteration:
                                 break
-                    return edge_list
-
+                        return edge_list
+                    if isinstance(data, dict):
+                        instance.tmp_rid = data
+                        return instance
             else:
                 raise SerializationException("there is no class with name '{}'".format(class_name))
 

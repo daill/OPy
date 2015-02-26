@@ -29,6 +29,9 @@ class BaseEntity(object):
         self.clusterid = clusterid
         self.clusterposition = clusterposition
 
+    def __eq__(self, other):
+        return (self.clusterposition == other.clusterposition) and (self.clusterid == other.clusterid)
+
 class BaseVertex(BaseEntity):
     """
     Class which has to be implemented by all class who should be persisted within the orientdb
@@ -88,5 +91,6 @@ class BaseEdge(BaseEntity):
     """
     def __init__(self, target:BaseVertex=None):
         super().__init__()
+        self.tmp_rid = None
         self.in_vertex = None
         self.out_vertex = target
