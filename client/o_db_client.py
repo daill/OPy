@@ -14,7 +14,8 @@
 
 import logging
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
-from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop
+from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, CreateType, Vertices, \
+    Edges
 from common.o_db_exceptions import OPyClientException, SerializationException
 from database.o_db_connection import OConnection
 from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
@@ -116,7 +117,6 @@ class OClient(object):
         """
         try:
             if isinstance(obj, BaseVertex):
-                print("jap")
                 data_to_store = obj.persistent_attributes()
 
                 for attr_name in data_to_store:
@@ -158,15 +158,18 @@ class OClient(object):
             # check if there are edges and iterate through them
             if edges:
                 for key in edges:
-                    edge = edges[key]
-                    out_vertex = edge.out_vertex
+                    edge_list = edges[key]
+                    for edge in edge_list:
 
-                    # recursive call
-                    self.createvertex(Vertex(out_vertex))
+                        out_vertex = edge.out_vertex
 
-                    #  outvertex should now own a rid, so we can persist an edge
-                    edge = self.create(Edge(edge))
+                        # recursive call
+                        self.createvertex(Vertex(out_vertex))
 
+                        #  outvertex should now own a rid, so we can persist an edge
+                        edge = self.create(Edge(edge))
+
+            return object
         except Exception as err:
             logging.error(err)
 
@@ -182,12 +185,42 @@ class OClient(object):
             type = query_action.type
             if isinstance(type, Vertex):
                 return self.createvertex(type)
+            elif isinstance(type, Vertices):
+                object = type.getobject()
+                if isinstance(object, list) or isinstance(object, set):
+                    for vertex in object:
+                        if isinstance(vertex, BaseVertex):
+                            self.createvertex(Vertex(vertex))
+                        else:
+                            logging.error("element has to subclass BaseVertex")
+                elif isinstance(object, dict):
+                    for vertex in object.items():
+                        if isinstance(vertex, BaseVertex):
+                            self.createvertex(Vertex(vertex))
+                        else:
+                            logging.error("element has to subclass BaseVertex")
+                return type.getobject()
             elif isinstance(type, Edge):
                 return self.createedge(type)
+            elif isinstance(type, Edges):
+                object = type.getobject()
+                if isinstance(object, list) or isinstance(object, set):
+                    for edge in object:
+                        if isinstance(edge, BaseEdge):
+                            self.createedge(Edge(edge))
+                        else:
+                            logging.error("element has to subclass BaseEdge")
+                elif isinstance(object, dict):
+                    for edge in object.items():
+                        if isinstance(edge, BaseEdge):
+                            self.createedge(Edge(edge))
+                        else:
+                            logging.error("element has to subclass BaseEdge")
+                return type.getobject()
             elif isinstance(type, Class):
-                raise OPyClientException("class has not been implemeneted yet")
+                raise OPyClientException("class has not been implemented yet")
             else:
-                raise OPyClientException("don't know how to handel tpye '{}'".format(str(type)))
+                raise OPyClientException("don't know how to handle type '{}'".format(str(type)))
 
         elif isinstance(query_action, Drop):
             pass
@@ -198,13 +231,13 @@ class OClient(object):
     def update(self, query_type:QueryType):
         pass
 
-    def create(self, query_type:QueryType):
-        if isinstance(query_type, Vertex):
+    def create(self, query_type:CreateType):
+        if isinstance(query_type, Vertex) or isinstance(query_type, Vertices):
             result_query = query_type.parse()
             persistent_object = query_type.getobject()
 
             # execute command
-            command = OSQLCommand(result_query, non_text_limit=-1, fetchplan="", serialized_params="")
+            command = OSQLCommand(result_query, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
             response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
             logging.debug("response data '{}'".format(response_data))
 
@@ -239,7 +272,7 @@ class OClient(object):
                 query_string = query_type.parse()
 
                 # fetchplan is only needed on select query
-                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="", serialized_params="")
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
                 return self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
             except Exception as err:
                 logging.error(err)
@@ -249,7 +282,7 @@ class OClient(object):
                 persistent_object = query_type.getobject()
 
                 # execute command
-                command = OSQLCommand(result_query, non_text_limit=-1, fetchplan="", serialized_params="")
+                command = OSQLCommand(result_query, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
                 response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
                 logging.debug("response data '{}'".format(response_data))
 

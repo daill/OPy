@@ -39,7 +39,7 @@ class QueryElement(object):
 
 class CreateType(QueryType):
     def __init__(self):
-        pass
+        self.fetchplan = ""
 
 class Linkage(QueryElement):
     def __init__(self):
@@ -60,6 +60,7 @@ class Drop(QueryType):
 
 class Class(CreateType):
     def __init__(self, persistent_class:BaseEntity, class_type:str):
+        super().__init__()
         self.__persistent_class = persistent_class
         self.__class_name = getattr(persistent_class, '__name__')
         self.__class_type = class_type
@@ -79,6 +80,14 @@ class Class(CreateType):
 
         return result_query
 
+class Edges(CreateType):
+    def __init__(self, object):
+        super().__init__()
+        self.__object = object
+
+    def getobject(self):
+        return self.__object
+
 class Edge(CreateType):
     """
     CREATE EDGE <class> [CLUSTER <cluster>] FROM <rid>|(<query>)|[<rid>]* TO <rid>|(<query>)|[<rid>]*
@@ -88,6 +97,7 @@ class Edge(CreateType):
     TODO: implement properties, specific cluster, select
     """
     def __init__(self, object:BaseEdge):
+        super().__init__()
         self.__object = object
 
     def getobject(self):
@@ -118,11 +128,20 @@ class Edge(CreateType):
 
         return result_query
 
+class Vertices(CreateType):
+    def __init__(self, object):
+        super().__init__()
+        self.__object = object
+
+    def getobject(self):
+        return self.__object
+
 class Vertex(CreateType):
     """
     Creates a new vertex by using the given class
     """
     def __init__(self, object:BaseVertex):
+        super().__init__()
         self.__object = object
 
     def getobject(self):
