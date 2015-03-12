@@ -13,8 +13,17 @@
 # limitations under the License.
 
 from client import BaseVertex
+from client.o_db_base import BaseEdge
 
 __author__ = 'daill'
+
+class TestEdgeOne(BaseEdge):
+    def __init__(self):
+        pass
+
+class TestEdgeTwo(BaseEdge):
+    def __init__(self):
+        pass
 
 
 class TestObject(BaseVertex):

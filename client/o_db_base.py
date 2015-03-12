@@ -44,6 +44,14 @@ class BaseVertex(BaseEntity):
         self.__in_edges = None
         self.__out_edges = None
 
+    @classmethod
+    def withRID(cls, clusterid, clusterposition):
+        return_obj = cls()
+        return_obj.clusterid = clusterid
+        return_obj.clusterposition = clusterposition
+        return return_obj
+
+
     def persistent_attributes(self):
         """
         This method should the names of the fields which should be saved by persistence framework to the orient db instance

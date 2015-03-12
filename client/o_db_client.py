@@ -14,8 +14,8 @@
 
 import logging
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
-from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, CreateType, Vertices, \
-    Edges
+from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, GraphType, Vertices, \
+    Edges, Property, Delete, Index, Cluster
 from common.o_db_exceptions import OPyClientException, SerializationException
 from database.o_db_connection import OConnection
 from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
@@ -105,42 +105,31 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
-
-    def addrecord(self):
-        pass
-
-    def save(self, obj:object):
-        """
-        Process the given object to store the entities into the database
-        :param obj:
-        :return: True if the save has been completed, otherwise False
-        """
+    def delete(self, query:QueryType):
         try:
-            if isinstance(obj, BaseVertex):
-                data_to_store = obj.persistent_attributes()
+            if isinstance(query, Update):
+                query_string = query.parse()
+                # fetchplan is only needed on select query
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="", serialized_params="")
+                result_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.IDEMPOTENT, command_payload=command)
 
-                for attr_name in data_to_store:
-                    print("attr " + attr_name)
-                    print("attr_content " + obj.__getattribute__(attr_name))
-        except AttributeError as e:
-            print(e)
+                logging.debug("select received {}".format(result_data))
 
+                return result_data
+        except Exception as err:
+            logging.error(err)
 
-    def addvertex(self, p_object:BaseVertex):
-        pass
-
-    def delvertex(self):
-        """
-        Deletes a vertex
-        """
-        pass
-
-    def createedge(self, object:Edge):
-        """
-        Creates a simple edge between two vertices.
-        """
+    def update(self, query:QueryType):
         try:
-            self.create(object)
+            if isinstance(query, Update):
+                query_string = query.parse()
+                # fetchplan is only needed on select query
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="", serialized_params="")
+                result_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.IDEMPOTENT, command_payload=command)
+
+                logging.debug("select received {}".format(result_data))
+
+                return result_data
         except Exception as err:
             logging.error(err)
 
@@ -170,6 +159,35 @@ class OClient(object):
                         edge = self.create(Edge(edge))
 
             return object
+        except Exception as err:
+            logging.error(err)
+
+    def createedge(self, object:Edge):
+        """
+        Creates a simple edge between two vertices.
+        """
+        try:
+            self.create(object)
+        except Exception as err:
+            logging.error(err)
+
+    def delete(self, query_type:QueryType):
+        try:
+            query_string = query_type.parse()
+
+            # fetchplan is only needed on select query
+            command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
+            return self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+        except Exception as err:
+            logging.error(err)
+
+    def drop(self, query_type:QueryType):
+        try:
+            query_string = query_type.parse()
+
+            # fetchplan is only needed on select query
+            command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
+            return self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
         except Exception as err:
             logging.error(err)
 
@@ -218,7 +236,9 @@ class OClient(object):
                             logging.error("element has to subclass BaseEdge")
                 return type.getobject()
             elif isinstance(type, Class):
-                raise OPyClientException("class has not been implemented yet")
+                return self.create(type)
+            elif isinstance(type, Property):
+                return self.create(type)
             else:
                 raise OPyClientException("don't know how to handle type '{}'".format(str(type)))
 
@@ -228,17 +248,14 @@ class OClient(object):
             raise OPyClientException("i don't know what to do")
 
 
-    def update(self, query_type:QueryType):
-        pass
-
-    def create(self, query_type:CreateType):
+    def create(self, query_type:GraphType):
         if isinstance(query_type, Vertex) or isinstance(query_type, Vertices):
             result_query = query_type.parse()
             persistent_object = query_type.getobject()
 
             # execute command
             command = OSQLCommand(result_query, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
-            response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+            response_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
             logging.debug("response data '{}'".format(response_data))
 
             # steps to extract data from response
@@ -283,7 +300,7 @@ class OClient(object):
 
                 # execute command
                 command = OSQLCommand(result_query, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
-                response_data =  self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+                response_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
                 logging.debug("response data '{}'".format(response_data))
 
                 # steps to extract data from response
@@ -310,19 +327,18 @@ class OClient(object):
                                 logging.info("cannot handle asynch response, yet")
             except Exception as err:
                 logging.error(err)
+        elif isinstance(query_type, Property):
+            try:
+                result_query = query_type.parse()
 
+                # execute command
+                command = OSQLCommand(result_query, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
+                response_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+                logging.debug("response data '{}'".format(response_data))
 
-    def addedge(self):
-        """
-        Creates an edge of the given type from one vertex to another
-        """
-        pass
-
-    def deledge(self):
-        """
-        Deletes an edge between two vertices
-        """
-        pass
+                return response_data
+            except Exception as err:
+                logging.error(err)
 
     def fetch(self, query:QueryType):
         try:
@@ -339,7 +355,6 @@ class OClient(object):
                 # resulting objects list
                 fetchedobjects = dict()
                 returningobject = dict()
-                firstrun = True
 
                 if issubclass(clazz, BaseEntity):
                     if "success_status" in result_data:
@@ -363,7 +378,7 @@ class OClient(object):
 
                                                     if '#{}:{}'.format(clusterid, clusterposition) not in returningobject:
 
-                                                        parsedobject = self.parse_object(record_content=record.get("record-content"), clazz=clazz)
+                                                        parsedobject = self.parseobject(record_content=record.get("record-content"), clazz=clazz)
 
                                                         parsedobject.setRID(clusterid, clusterposition)
                                                         parsedobject.version = version
@@ -422,7 +437,7 @@ class OClient(object):
         """
         self.__odb.dbclose(self.__connection)
 
-    def parse_object(self, record_content:str, clazz):
+    def parseobject(self, record_content:str, clazz):
         logging.debug("start parsing record content")
 
         if issubclass(clazz, BaseVertex):

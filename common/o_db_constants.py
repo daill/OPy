@@ -179,5 +179,8 @@ class ORidBagType(Enum):
     EMBEEDED = 1
     TREE = 2
 
-
-
+class OSQLOperationType(Enum):
+    CREATE = 1
+    DELETE = 2
+    DROP = 3
+    UPDATE = 4
