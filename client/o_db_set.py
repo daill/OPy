@@ -17,7 +17,7 @@ import io
 import logging
 from client.o_db_base import BaseEntity, BaseEdge, BaseVertex
 from client.o_db_utils import escapeclassname
-from common.o_db_constants import OBinaryType, OPlainClass, OSQLOperationType
+from common.o_db_constants import OBinaryType, OPlainClass, OSQLOperationType, OSQLIndexType
 from common.o_db_exceptions import SQLCommandException, WrongTypeException, OPyClientException
 
 __author__ = 'daill'
@@ -258,10 +258,6 @@ class Property(GraphType):
         return cls(persistent_class, property_name, property_type, linked_type, None)
 
 class Cluster(GraphType):
-    def __init__(self):
-        super().__init__()
-
-class Index(GraphType):
     def __init__(self):
         super().__init__()
 
@@ -905,5 +901,69 @@ class And(WhereType):
             self._query = query_string.getvalue()
         except Exception as err:
             logging.error(err)
+
+class Index(GraphType):
+    """
+    CREATE INDEX <name> [ON <class-name> (prop-names)] <type> [<key-type>] METADATA [{<json-metadata>}]
+    If prop is type of LINKMAP or EMBEDDEDMAP you kann add "by key" or "by value" to the property name
+    """
+    def __init__(self, obj):
+        super().__init__()
+        self.__obj = obj
+        self.__metadata = None
+        self.__type = None
+        self.__clazz = None
+        self.__properties = None
+
+    def on(self, clazz:BaseEntity, properties:list=None, type:OSQLIndexType=None):
+        self.__clazz = clazz
+        self.__properties = properties
+        self.__type = type
+        return self
+
+
+    def withmeta(self, metadata:str):
+        self.__metadata = metadata
+        return self
+
+    def parse(self):
+        try:
+            query_string = io.StringIO()
+
+
+            if self.operationtype == OSQLOperationType.CREATE:
+                query_string.write("create index ")
+                if isinstance(self.__obj, str):
+                    if self.__properties:
+                        query_string.write(self.__obj)
+                        query_string.write(" on ")
+                        query_string.write(self.__clazz.__name__)
+                        query_string.write(" (")
+                        for i,prop in enumerate(self.__properties):
+                            query_string.write(prop)
+                            if i < len(self.__properties)-1:
+                                query_string.write(", ")
+                        query_string.write(") ")
+                    else:
+                        query_string.write(self.__clazz.__name__)
+                        query_string.write(".")
+                        query_string.write(self.__obj)
+
+                if self.__type:
+                    query_string.write(" ")
+                    query_string.write(self.__type.value)
+
+                if self.__metadata:
+                    query_string.write(" metadata ")
+                    query_string.write(self.__metadata)
+
+
+            result_query = query_string.getvalue()
+
+            return result_query
+        except Exception as err:
+            logging.error(err)
+        finally:
+            query_string.close()
 
 

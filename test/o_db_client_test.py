@@ -15,8 +15,8 @@
 import unittest
 from client.o_db_base import BaseVertex
 from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert, Update, Set, \
-    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge
-from common.o_db_constants import OBinaryType
+    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge, Index
+from common.o_db_constants import OBinaryType, OSQLIndexType
 from test.model.o_db_test_model import TestObject, TestLocation, TestCoordinates, TestEdgeOne
 
 __author__ = 'daill'
@@ -138,6 +138,19 @@ class ODBClientTests(unittest.TestCase):
 
         query = Drop(Property(TestLocation, "Test")).parse()
         self.assertEquals(query, "drop property TestLocation.Test")
+
+    def test_index(self):
+        query = Create(Index("test").on(TestCoordinates, ["id", "bla", "hallo"])).parse()
+        self.assertEquals(query, "create index test on TestCoordinates (id, bla, hallo) ")
+
+        query = Create(Index("test").on(TestCoordinates, ["id", "bla", "hallo"]).withmeta("{lala: false}")).parse()
+        self.assertEquals(query, "create index test on TestCoordinates (id, bla, hallo)  metadata {lala: false}")
+
+        query = Create(Index("id").on(TestCoordinates)).parse()
+        self.assertEquals(query, "create index TestCoordinates.id")
+
+        query = Create(Index("id").on(TestCoordinates, None, OSQLIndexType.UNIQUE)).parse()
+        self.assertEquals(query, "create index TestCoordinates.id unique")
 
 
 if __name__ == "__main__":

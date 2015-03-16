@@ -184,3 +184,8 @@ class OSQLOperationType(Enum):
     DELETE = 2
     DROP = 3
     UPDATE = 4
+
+class OSQLIndexType(Enum):
+    UNIQUE = 'unique'
+    NOTUNIQUE = 'notunique'
+    FULLTEXT = 'fulltext'
