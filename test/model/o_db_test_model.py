@@ -35,7 +35,7 @@ class TestCoordinates(TestObject):
         self.lat = None
         self.lng = None
 
-    def persistent_attributes(self):
+    def persistentattributes(self):
         return ['lat', 'lng']
 
 
@@ -43,7 +43,7 @@ class TestCity(TestObject):
     def __init__(self):
         self.name = None
 
-    def persistent_attributes(self):
+    def persistentattributes(self):
         return ['name']
 
 
@@ -53,7 +53,7 @@ class TestLocation(TestObject):
         self.city = None
         self.coordinates = None
 
-    def persistent_attributes(self):
+    def persistentattributes(self):
         return ['name', 'city', 'coordinates']
 
 

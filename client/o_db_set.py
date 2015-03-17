@@ -386,7 +386,7 @@ class Vertex(GraphType):
                     query_string.write(escapeclassname(self.__class_name)) # append class name
 
                     # read "marked" attributes
-                    data_to_store = self.__object.persistent_attributes()
+                    data_to_store = self.__object.persistentattributes()
 
                     count = len(data_to_store)
                     if count > 0:
@@ -437,7 +437,7 @@ class Insert(QueryType):
             query_string.write(escapeclassname(self.__clazz_name))
             query_string.write(" ")
 
-            persistent_attributes = self.__object.persistent_attributes()
+            persistent_attributes = self.__object.persistentattributes()
 
             if len(persistent_attributes) > 0:
                 query_string.write("( ")

@@ -52,7 +52,7 @@ class BaseVertex(BaseEntity):
         return return_obj
 
 
-    def persistent_attributes(self):
+    def persistentattributes(self):
         """
         This method should the names of the fields which should be saved by persistence framework to the orient db instance
         :return: List of field names

@@ -155,7 +155,7 @@ class OBinarySerializer(OSerializer):
 
             result_values = b''
 
-            fields = data.persistent_attributes()
+            fields = data.persistentattributes()
             temp_header_bytes = dict()
             temp_value_bytes = dict()
             temp_type_bytes = dict()
