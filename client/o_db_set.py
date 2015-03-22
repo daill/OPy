@@ -45,6 +45,64 @@ class WhereType(QueryElement):
     def __init__(self):
         super().__init__()
 
+class Prefixed(object):
+    def __init__(self, clazz:BaseEntity, prefix:str):
+        self.clazz = clazz
+        self.prefix = prefix
+
+class Move(QueryType):
+    """
+    MOVE VERTEX <source> TO <destination> [SET [<field>=<value>]* [,]] [MERGE <JSON>]
+    """
+    def __init__(self, src, dest:GraphType, *queryelements):
+        super().__init__()
+        self.__src = src
+        self.__dest = dest
+        self.__dest.operationtype = OSQLOperationType.MOVE
+        self.__queryelements = queryelements
+
+    def parse(self):
+        try:
+            query_string = io.StringIO()
+            query_string.write("move vertex ")
+
+            if isinstance(self.__src, str):
+                # just one rid
+                query_string.write(self.__src)
+            elif isinstance(self.__src, list):
+                # list of rids
+                query_string.write('[')
+                for i, rid in enumerate(self.__src):
+                    query_string.write(rid)
+
+                    if i < len(self.__src)-1:
+                        query_string.write(",")
+                query_string.write(']')
+            elif isinstance(self.__src, Select):
+                query_string.write('(')
+                query_string.write(self.__src.parse())
+                query_string.write(')')
+            query_string.write(" to ")
+
+            if isinstance(self.__dest, Class):
+                query_string.write("class: ")
+                query_string.write(self.__dest.parse())
+            elif isinstance(self.__dest, Cluster):
+                query_string.write("cluster: ")
+                query_string.write(self.__dest.parse())
+
+            for element in self.__queryelements:
+                if isinstance(element, Set) or isinstance(element, Merge):
+                    query_string.write(str(element))
+
+            result_string = query_string.getvalue()
+            return result_string
+
+        except Exception as err:
+            logging.error(err)
+        finally:
+            query_string.close()
+
 class Delete(QueryType):
     """
     Class to provide deletion of vertices and edges
@@ -188,6 +246,7 @@ class Create(QueryType):
     def __init__(self, type:GraphType):
         self.type = type
         self.type.operationtype = OSQLOperationType.CREATE
+        pass
 
     def parse(self):
         return self.type.parse()
@@ -258,8 +317,12 @@ class Property(GraphType):
         return cls(persistent_class, property_name, property_type, linked_type, None)
 
 class Cluster(GraphType):
-    def __init__(self):
+    def __init__(self, name:str):
         super().__init__()
+        self.name = name
+
+    def parse(self):
+        return self.name
 
 class Class(GraphType):
     def __init__(self, persistent_class:BaseEntity, class_type:OPlainClass=None):
@@ -290,6 +353,8 @@ class Class(GraphType):
                     query_string.write(" edge ")
                 elif issubclass(self.__persistent_class, BaseVertex):
                     query_string.write(" vertex ")
+                query_string.write(self.__class_name)
+            elif self.operationtype == OSQLOperationType.MOVE:
                 query_string.write(self.__class_name)
 
             result_query = query_string.getvalue()
@@ -482,12 +547,19 @@ class Select(QueryType):
         [LOCK default|record]
         [PARALLEL]
     """
-    def __init__(self, clazz:BaseEntity, props:list=None, *elements:QueryElement):
+    def __init__(self, obj, props:list=None, *elements:QueryElement):
         self.__elements = elements
         self.__query_dict = dict()
-        self.__clazz = clazz
-        self.__clazz_name = getattr(clazz,'__name__')
         self.__prefix = None
+
+        if isinstance(obj, Prefixed):
+            self.__clazz = obj.clazz
+            self.__prefix = obj.prefix
+        else:
+            self.__clazz = obj
+
+        self.__clazz_name = getattr(self.__clazz,'__name__')
+
         self.__query_rule_index = ["Let", "Where", "GroupBy", "OrderBy", "Skip", "Limit", "Fetchplan", "Timeout", "Lock", "Parallel"]
         self.__props = props
 
@@ -496,9 +568,13 @@ class Select(QueryType):
             query_string = io.StringIO()
             query_string.write("select ")
             if len(self.__props) > 0:
-                for projection in self.__props:
+                for i, projection in enumerate(self.__props):
                     query_string.write(projection)
-                    query_string.write(" ")
+
+                    if i < len(self.__props)-1:
+                        query_string.write(", ")
+                query_string.write(" ")
+
             query_string.write("from ")
             query_string.write(escapeclassname(self.__clazz_name))
             if self.__prefix:
@@ -690,8 +766,7 @@ class To(QueryElement):
     def __init__(self, rid:str):
         self.rid = rid
 
-
-class UpdateActionElement(QueryElement):
+class ActionElement(QueryElement):
     def __init__(self, type:str, fields:dict):
         self.__type = type
         self.__fields = fields
@@ -726,31 +801,31 @@ class UpdateActionElement(QueryElement):
         finally:
             query_string.close()
 
-class Set(UpdateActionElement):
+class Set(ActionElement):
     def __init__(self, fields:dict):
         super().__init__("set", fields)
 
-class Increment(UpdateActionElement):
+class Increment(ActionElement):
     def __init__(self, fields:dict):
         super().__init__("increment", fields)
 
-class Add(UpdateActionElement):
+class Add(ActionElement):
     def __init__(self, fields:dict):
         super().__init__("add", fields)
 
-class Remove(UpdateActionElement):
+class Remove(ActionElement):
     def __init__(self, fields:dict):
         super().__init__("remove", fields)
 
-class Put(UpdateActionElement):
+class Put(ActionElement):
     def __init__(self, fields:dict):
         super().__init__("put", fields)
 
-class Content(UpdateActionElement):
+class Content(ActionElement):
     def __init__(self):
         pass
 
-class Merge(UpdateActionElement):
+class Merge(ActionElement):
     def __init__(self):
         pass
 

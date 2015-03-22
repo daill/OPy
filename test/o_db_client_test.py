@@ -15,15 +15,22 @@
 import unittest
 from client.o_db_base import BaseVertex
 from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert, Update, Set, \
-    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge, Index
-from common.o_db_constants import OBinaryType, OSQLIndexType
+    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge, Index, Prefixed, Move, Cluster
+from common.o_db_constants import OBinaryType, OSQLIndexType, OPlainClass
+from common.o_db_model import OSQLClassName
 from test.model.o_db_test_model import TestObject, TestLocation, TestCoordinates, TestEdgeOne
 
 __author__ = 'daill'
 
 class ODBClientTests(unittest.TestCase):
 
-    def test_selectwhere(self):
+    def test_select(self):
+        query = Select(TestLocation, (), ()).parse()
+        self.assertEqual(query, "select from TestLocation")
+
+        query = Select(TestLocation, ["name"], ()).parse()
+        self.assertEqual(query, "select name from TestLocation")
+
         query = Select(TestLocation, (), Where(Or(Condition("name").iseq("Eddies"),Condition("type").iseq("Pizaaria")))).parse()
         self.assertEqual(query, "select from TestLocation  where  ( name = 'Eddies'  or type = 'Pizaaria'  )  ")
 
@@ -39,9 +46,8 @@ class ODBClientTests(unittest.TestCase):
         query = Select(TestLocation, (), Where(Select(TestLocation, (), Where(Condition("a").iseq("a"))))).parse()
         self.assertEqual(query, "select from TestLocation  where (select from TestLocation  where a = 'a' ) ")
 
-    def test_selectorderofelements(self):
-        query = Select(TestLocation,["l.a", "l.b"], OrderBy("a").asc(), Where(Condition("l.a").iseq("b"))).parse()
-        self.assertEqual(query, "select l.a l.b from Location l where l.a = b;")
+        query = Select(Prefixed(TestCoordinates, 'l'),["l.a", "l.b"], OrderBy.asc("a"), Where(Condition("l.a").iseq("b"))).parse()
+        self.assertEqual(query, "select l.a, l.b from TestCoordinates l  where l.a = 'b'   order by a asc ")
 
     def test_orderby(self):
         query = str(OrderBy("a"))
@@ -151,6 +157,21 @@ class ODBClientTests(unittest.TestCase):
 
         query = Create(Index("id").on(TestCoordinates, None, OSQLIndexType.UNIQUE)).parse()
         self.assertEquals(query, "create index TestCoordinates.id unique")
+
+    def test_create(self):
+        query = Create(Class(TestCoordinates, OPlainClass.VERTEX)).parse()
+        self.assertEquals(query, "create class TestCoordinates extends V")
+
+        query = Create(Class(TestEdgeOne, OPlainClass.EDGE)).parse()
+        self.assertEquals(query, "create class TestEdgeOne extends E")
+
+
+    def test_move(self):
+        query = Move("#12:2", Class(TestLocation)).parse()
+        self.assertEquals(query, "move vertex #12:2 to class: TestLocation")
+
+        query = Move("#12:2", Cluster("testcluster")).parse()
+        self.assertEquals(query, "move vertex #12:2 to cluster: testcluster")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@
 import logging
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
 from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, GraphType, Vertices, \
-    Edges, Property, Delete, Index, Cluster
+    Edges, Property, Delete, Index, Cluster, Move
 from common.o_db_exceptions import OPyClientException, SerializationException
 from database.o_db_connection import OConnection
 from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
@@ -105,12 +105,12 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
-    def delete(self, query:QueryType):
+    def delete(self, query:GraphType):
         try:
             if isinstance(query, Update):
                 query_string = query.parse()
                 # fetchplan is only needed on select query
-                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="", serialized_params="")
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query.fetchplan, serialized_params="")
                 result_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.IDEMPOTENT, command_payload=command)
 
                 logging.debug("select received {}".format(result_data))
@@ -119,12 +119,12 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
-    def update(self, query:QueryType):
+    def update(self, query:GraphType):
         try:
             if isinstance(query, Update):
                 query_string = query.parse()
                 # fetchplan is only needed on select query
-                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="", serialized_params="")
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query.fetchplan, serialized_params="")
                 result_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.IDEMPOTENT, command_payload=command)
 
                 logging.debug("select received {}".format(result_data))
@@ -155,7 +155,7 @@ class OClient(object):
                         # recursive call
                         self.createvertex(Vertex(out_vertex))
 
-                        #  outvertex should now own a rid, so we can persist an edge
+                        # outvertex should now own a rid, so we can persist an edge
                         edge = self.create(Edge(edge))
 
             return object
@@ -168,10 +168,22 @@ class OClient(object):
         """
         try:
             self.create(object)
+
+            return object
         except Exception as err:
             logging.error(err)
 
     def delete(self, query_type:QueryType):
+        try:
+            query_string = query_type.parse()
+
+            # fetchplan is only needed on select query
+            command = OSQLCommand(query_string, non_text_limit=-1, fetchplan='', serialized_params="")
+            return self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+        except Exception as err:
+            logging.error(err)
+
+    def drop(self, query_type:GraphType):
         try:
             query_string = query_type.parse()
 
@@ -181,7 +193,7 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
-    def drop(self, query_type:QueryType):
+    def move(self, query_type:GraphType):
         try:
             query_string = query_type.parse()
 
@@ -199,6 +211,12 @@ class OClient(object):
             return self.fetch(query_action)
         elif isinstance(query_action, Update):
             return self.update(query_action)
+        elif isinstance(query_action, Delete):
+            return self.delete(query_action)
+        elif isinstance(query_action, Drop):
+            return self.drop(query_action)
+        elif isinstance(query_action, Move):
+            return self.move(query_action)
         elif isinstance(query_action, Create):
             type = query_action.type
             if isinstance(type, Vertex):
@@ -241,9 +259,6 @@ class OClient(object):
                 return self.create(type)
             else:
                 raise OPyClientException("don't know how to handle type '{}'".format(str(type)))
-
-        elif isinstance(query_action, Drop):
-            pass
         else:
             raise OPyClientException("i don't know what to do")
 
