@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from lib2to3.pytree import Base
 
 import logging
-from client.o_db_base import BaseVertex, BaseEdge, BaseEntity
+from client.o_db_base import BaseVertex, BaseEdge, BaseEntity, SystemType
 from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, GraphType, Vertices, \
-    Edges, Property, Delete, Index, Cluster, Move
+    Edges, Property, Delete, Index, Cluster, Move, Traverse
 from common.o_db_exceptions import OPyClientException, SerializationException
 from database.o_db_connection import OConnection
 from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
@@ -173,6 +174,42 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
+    def exec(self, query:str, fetchplan:str, raw:bool=True):
+        try:
+            # fetchplan is only needed on select query
+            command = OSQLCommand(query, non_text_limit=-1, fetchplan=fetchplan, serialized_params="")
+            response_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+
+            if raw:
+                return response_data
+            # else:
+                # steps to extract data from response
+                # TODO: sync vs. asynch
+                # if response_data:
+                #     if "success_status" in response_data:
+                #         status = response_data.get("success_status")
+                #         if status == 0:
+                #             # next to an exception there are various reasons for success or a failure, so we
+                #             # we have to check the status
+                #             if "result" in response_data:
+                #                 logging.debug("parse synch response result for adding edge")
+                #                 result_data = response_data.get("result")
+                #                 for records_data in result_data:
+                #                     if "records" in records_data:
+                #                         for record in records_data.get("records"):
+                #                             if "cluster-id" in record and "cluster-position" in record:
+                #                                 persistent_object.setRID(record.get("cluster-id"), record.get("cluster-position"))
+                #                                 persistent_object.version = record.get("record-version")
+                #                             else:
+                #                                 logging.error("no cluster information available")
+                #                                 # possibly raise an exception
+                #             if "asynch-result-type" in response_data:
+                #                 logging.info("cannot handle asynch response, yet")
+
+        except Exception as err:
+            logging.error(err)
+
+
     def delete(self, query_type:QueryType):
         try:
             query_string = query_type.parse()
@@ -208,6 +245,8 @@ class OClient(object):
             raise OPyClientException("you have to specify a query")
 
         if isinstance(query_action, Select):
+            return self.fetch(query_action)
+        elif isinstance(query_action, Traverse):
             return self.fetch(query_action)
         elif isinstance(query_action, Update):
             return self.update(query_action)
@@ -257,6 +296,8 @@ class OClient(object):
                 return self.create(type)
             elif isinstance(type, Property):
                 return self.create(type)
+            elif isinstance(type, str):
+                return
             else:
                 raise OPyClientException("don't know how to handle type '{}'".format(str(type)))
         else:
@@ -355,66 +396,67 @@ class OClient(object):
             except Exception as err:
                 logging.error(err)
 
-    def fetch(self, query:QueryType):
+    def fetch(self, query_type:QueryType):
         try:
-            if isinstance(query, Select):
-                query_string = query.parse()
+            if isinstance(query_type, Select) or isinstance(query_type, Traverse):
+                query_string = query_type.parse()
                 # fetchplan is only needed on select query
-                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan="*:-1", serialized_params="")
+                command = OSQLCommand(query_string, non_text_limit=-1, fetchplan=query_type.fetchplan, serialized_params="")
                 result_data = self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.IDEMPOTENT, command_payload=command)
 
-                logging.debug("select received {}".format(result_data))
+                logging.debug("{} received {}".format(query_type.__class__.__name__,result_data))
 
-                clazz = query.getclass()
+                clazz = query_type.getclass()
 
                 # resulting objects list
                 fetchedobjects = dict()
                 returningobject = dict()
+                resultdata = None
 
-                if issubclass(clazz, BaseEntity):
-                    if "success_status" in result_data:
-                        status = result_data.get("success_status")
-                        if status == 0:
-                            # next to an exception there are various reasons for success or a failure, so we
-                            # we have to check the status
-                            if "result" in result_data:
-                                logging.debug("parse sync response result for fetching vertex")
-                                result_data = result_data.get("result")
-                                for records_data in result_data:
-                                    if "records" in records_data:
-                                        for record in records_data.get("records"):
-                                            if "cluster-id" in record and "cluster-position" in record and "record-content" in record:
-                                                # create objects and add values
-                                                # add to cache
-                                                try:
-                                                    clusterid = record.get("cluster-id")
-                                                    clusterposition = record.get("cluster-position")
-                                                    version = record.get("record-version")
+                # if issubclass(clazz, BaseEntity):
+                if "success_status" in result_data:
+                    status = result_data.get("success_status")
+                    if status == 0:
+                        # next to an exception there are various reasons for success or a failure, so we
+                        # we have to check the status
+                        if "result" in result_data:
+                            logging.debug("parse sync response result for fetching vertex")
+                            result_data = result_data.get("result")
+                            for records_data in result_data:
+                                if "records" in records_data:
+                                    for record in records_data.get("records"):
+                                        if "cluster-id" in record and "cluster-position" in record and "record-content" in record:
+                                            # create objects and add values
+                                            # add to cache
+                                            try:
+                                                clusterid = record.get("cluster-id")
+                                                clusterposition = record.get("cluster-position")
+                                                version = record.get("record-version")
 
-                                                    if '#{}:{}'.format(clusterid, clusterposition) not in returningobject:
+                                                if '#{}:{}'.format(clusterid, clusterposition) not in returningobject:
 
-                                                        parsedobject = self.parseobject(record_content=record.get("record-content"), clazz=clazz)
+                                                    parsedobject, resultdata = self.parseobject(record_content=record.get("record-content"), clazz=clazz)
 
-                                                        parsedobject.setRID(clusterid, clusterposition)
-                                                        parsedobject.version = version
+                                                    parsedobject.setRID(clusterid, clusterposition)
+                                                    parsedobject.version = version
 
-                                                        if isinstance(parsedobject, clazz):
-                                                            returningobject[parsedobject.getRID()] = parsedobject
+                                                    # if isinstance(parsedobject, clazz):
+                                                    #     returningobject[parsedobject.getRID()] = parsedobject
 
-                                                        fetchedobjects[parsedobject.getRID()] = parsedobject
+                                                    fetchedobjects[parsedobject.getRID()] = parsedobject
 
-                                                        logging.debug('{} {} {} {}'.format(clusterid, clusterposition, version, record.get("record-content")))
+                                                    logging.debug("clusterid '{}' clusterposition '{}'  version '{}'  content '{}'".format(clusterid, clusterposition, version, record.get("record-content")))
 
-                                                except SerializationException as err:
-                                                        logging.error(err)
+                                            except SerializationException as err:
+                                                    logging.error(err)
 
-                                            else:
-                                                logging.error("no cluster information available")
-                                                # possibly raise an exception
-                            if "asynch-result-type" in result_data:
-                                logging.info("cannot handle asynch response, yet")
-                    else:
-                        logging.info("no data fetched")
+                                        else:
+                                            logging.error("no cluster information available")
+                                            # possibly raise an exception
+                        if "asynch-result-type" in result_data:
+                            logging.info("cannot handle asynch response, yet")
+                else:
+                    logging.info("no data fetched")
 
                 # now set the correct references based of the fetched objects
                 for rid in fetchedobjects:
@@ -425,22 +467,44 @@ class OClient(object):
                         edge_dict = object.out_edges
 
                         for edge_dict_key in edge_dict:
-                            for edge in edge_dict[edge_dict_key]:
-                                edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
-                                if edge_rid in fetchedobjects:
-                                    edge.out_vertex = fetchedobjects[edge_rid]
+                            for obj in edge_dict[edge_dict_key]:
+                                if isinstance(obj, list):
+                                    for edge in obj:
+                                        edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
+                                        if edge_rid in fetchedobjects:
+                                            edge.out_vertex = fetchedobjects[edge_rid]
+                                elif isinstance(obj, BaseEdge):
+                                    edge_rid = '#{}:{}'.format(obj.tmp_rid[0], obj.tmp_rid[1])
+                                    if edge_rid in fetchedobjects:
+                                        obj.out_vertex = fetchedobjects[edge_rid]
 
                         edge_dict = object.in_edges
 
                         for edge_dict_key in edge_dict:
-                            for edge in edge_dict[edge_dict_key]:
-                                edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
-                                if edge_rid in fetchedobjects:
-                                    edge.in_vertex = fetchedobjects[edge_rid]
+                            for obj in edge_dict[edge_dict_key]:
+                                if isinstance(obj,list):
+                                    for edge in obj:
+                                        edge_rid = '#{}:{}'.format(edge.tmp_rid[0], edge.tmp_rid[1])
+                                        if edge_rid in fetchedobjects:
+                                            edge.in_vertex = fetchedobjects[edge_rid]
+                                elif isinstance(obj, BaseEdge):
+                                    edge_rid = '#{}:{}'.format(obj.tmp_rid[0], obj.tmp_rid[1])
+                                    if edge_rid in fetchedobjects:
+                                        obj.in_vertex = fetchedobjects[edge_rid]
                     elif isinstance(object, BaseEdge):
-                        pass
+                        if isinstance(object.tmp_rid, dict):
+                            if 'in' in object.tmp_rid:
+                                in_rid = '#{}:{}'.format(object.tmp_rid['in'][0], object.tmp_rid['in'][1])
+                                if in_rid in fetchedobjects:
+                                    object.in_vertex = fetchedobjects[in_rid]
+                            if 'out' in object.tmp_rid:
+                                out_rid = '#{}:{}'.format(object.tmp_rid['out'][0], object.tmp_rid['out'][1])
+                                if out_rid in fetchedobjects:
+                                    object.out_vertex = fetchedobjects[out_rid]
 
-                return returningobject
+
+                fetchedobjects["rest"] = resultdata
+                return fetchedobjects
             else:
                 return None
         except Exception as err:
@@ -455,12 +519,12 @@ class OClient(object):
     def parseobject(self, record_content:str, clazz):
         logging.debug("start parsing record content")
 
-        if issubclass(clazz, BaseVertex):
-            logging.debug("class is from type BaseVertex")
-        elif issubclass(clazz, BaseEdge):
-            logging.debug("class is from type BaseEdge")
-        else:
-            raise SerializationException("could not determine type of given class to parse")
+        # if issubclass(clazz, BaseVertex):
+        #     logging.debug("class is from type BaseVertex")
+        # elif issubclass(clazz, BaseEdge):
+        #     logging.debug("class is from type BaseEdge")
+        # else:
+        #     raise SerializationException("could not determine type of given class to parse")
 
         if record_content:
             if ODriverConfig.SERIALIZATION == OSerialization.SERIALIZATION_CSV:
@@ -473,18 +537,33 @@ class OClient(object):
             data, class_name, rest = serializer.decode(record_content)
 
             if not class_name:
-                class_name = clazz.__name__
+                class_name = self.retrieveclassname(clazz)
 
-            parsedobject = serializer.toobject(class_name, data)
+            if class_name:
+                parsedobject, result_data = serializer.toobject(class_name, data)
+            else:
+                parsedobject = data
 
-            return parsedobject
+            return parsedobject, result_data
         else:
             raise SerializationException("record content string is empty")
+
+    def retrieveclassname(self, base_class):
+        """
+        This method decides whether it should use the default classname via magic member or custom method
+
+        :param base_class:
+        :return: class name for query
+        """
+        if isinstance(base_class, SystemType):
+            return base_class.getcustomclassname()
+
+        return base_class.__name__
 
 
     # build entity dict
     def createentitydict(self, base_class):
         subclasses = base_class.__subclasses__()
         for clazz in subclasses:
-            OClient.entities[clazz.__name__] = clazz.__module__
+            OClient.entities[self.retrieveclassname(clazz)] = clazz.__module__
             self.createentitydict(clazz)

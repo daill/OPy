@@ -67,8 +67,13 @@ class BaseVertex(BaseEntity):
         self.__out_edges = edges
 
         for edge_list in self.__out_edges.values():
-            for edge in edge_list:
-                edge.in_vertex = self
+            for obj in edge_list:
+                if isinstance(obj, BaseEdge):
+                    obj.in_vertex = self
+                elif isinstance(obj, list):
+                    for edge in obj:
+                        edge.in_vertex = self
+
 
         return self.__out_edges
 
@@ -80,8 +85,12 @@ class BaseVertex(BaseEntity):
         self.__in_edges = edges
 
         for edge_list in self.__in_edges.values():
-            for edge in edge_list:
-                edge.out_vertex = self
+            for obj in edge_list:
+                if isinstance(obj, BaseEdge):
+                    obj.out_vertex = self
+                elif isinstance(obj, list):
+                    for edge in obj:
+                        edge.out_vertex = self
 
         return self.__out_edges
 
@@ -102,3 +111,31 @@ class BaseEdge(BaseEntity):
         self.tmp_rid = None
         self.in_vertex = None
         self.out_vertex = target
+
+class SystemType(object):
+    """
+    This type is only to describe system types like metadata:schema
+    """
+    def __init__(self):
+        pass
+
+
+    @classmethod
+    def getcustomclassname(cls):
+        raise NotImplementedError("You have to implement this method")
+
+class GlobalProperties(BaseVertex, SystemType):
+    """
+    Class to represent the global properties
+    """
+    def __init__(self):
+        super().__init__()
+        self.globalProperties = None
+
+    @classmethod
+    def getcustomclassname(cls):
+        return "metadata:schema"
+
+
+    def persistentattributes(self):
+        return ['globalProperties']

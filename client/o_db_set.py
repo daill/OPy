@@ -16,7 +16,7 @@ from inspect import isclass
 import io
 import logging
 from client.o_db_base import BaseEntity, BaseEdge, BaseVertex
-from client.o_db_utils import escapeclassname
+from client.o_db_utils import escapeclassname, retrieveclassname
 from common.o_db_constants import OBinaryType, OPlainClass, OSQLOperationType, OSQLIndexType
 from common.o_db_exceptions import SQLCommandException, WrongTypeException, OPyClientException
 
@@ -24,10 +24,10 @@ __author__ = 'daill'
 
 class QueryType(object):
     def parse(self):
-        raise NotImplementedError("You have to implement the exec method")
+        raise NotImplementedError("You have to implement the parse method")
 
     def getclass(self):
-        raise NotImplementedError("You have to implement the exec method")
+        raise NotImplementedError("You have to implement the getclass method")
 
 class QueryElement(object):
     def __init__(self):
@@ -335,6 +335,15 @@ class Class(GraphType):
         # save module to database to identify on later following selection process
         self.__class_module = persistent_class.__module__
 
+    @classmethod
+    def field(cls, persistent_class:BaseEntity, fieldname:str):
+        obj = cls(persistent_class)
+
+        return "{}.{}".format(obj.__class_name, fieldname)
+
+    def classname(self):
+        return self.__class_name
+
     def parse(self):
         try:
             query_string = io.StringIO()
@@ -532,6 +541,93 @@ class Insert(QueryType):
         finally:
             query_string.close()
 
+class Traverse(QueryType):
+    """
+    TRAVERSE <[class.]field>|*|any()|all()
+         [FROM <target>]
+         [LET <Assignment>*]
+         WHILE <condition>
+         [LIMIT <max-records>]
+         [STRATEGY <strategy>]
+    """
+    def __init__(self, target, props:list=None, *elements:QueryElement):
+        super().__init__()
+        self.__target = target
+        self.__props = props
+        self.__elements = elements
+        self.__query_rule_index = ["Let", "While", "Limit", "Strategy"]
+        self.__query_dict = dict()
+        self.fetchplan = ""
+
+    def parse(self):
+        try:
+            query_string = io.StringIO()
+            query_string.write("traverse ")
+
+            if isinstance(self.__props, str):
+                # this is the case for *, any(), all() or one class with field
+                query_string.write(self.__props)
+            elif isinstance(self.__props, list):
+                for i, field in enumerate(self.__props):
+                    query_string.write(field)
+
+                    if i < len(self.__props)-1:
+                        query_string.write(", ")
+                query_string.write(" ")
+
+            query_string.write(" from ")
+
+            # a class, a cluster, list of clusters, a rid, list of rids, traverse or select
+            if isinstance(self.__target, Class):
+                query_string.write(self.__target.classname())
+            elif isinstance(self.__target, Traverse) or isinstance(self.__target, Select):
+                query_string.write(" ( ")
+                query_string.write(self.__target.parse())
+                query_string.write(" ) ")
+            elif isinstance(self.__target, Cluster):
+                query_string.write(self.__target.parse())
+            elif isinstance(self.__target, Prefixed):
+                query_string.write(getattr(self.__target.clazz,'__name__'))
+                query_string.write(self.__target.prefix)
+            elif isinstance(self.__target, list):
+                for i, target in enumerate(self.__target):
+                    if isinstance(target, str):
+                        query_string.write(target)
+                    elif isinstance(target, Cluster):
+                        query_string.write(target.parse())
+
+                    if i < len(self.__props)-1:
+                        query_string.write(", ")
+            elif isinstance(self.__target, str):
+                query_string.write(self.__target)
+            else:
+                logging.error("can't use traverse on type '{}'".format(type(self.__target)))
+
+
+            if self.__elements:
+                query_string.write(" ")
+                for element in self.__elements:
+                    self.__query_dict[element.__class__.__name__] = str(element)
+                for key in self.__query_rule_index:
+                    if key in self.__query_dict:
+                        query_string.write(" ")
+                        query_string.write(self.__query_dict[key])
+
+            result_string = query_string.getvalue()
+
+            logging.debug("parsed sql string: '{}' from data '{}'".format(result_string, self.__query_dict))
+
+            return result_string
+
+        except Exception as err:
+            logging.error(err)
+        finally:
+            query_string.close()
+
+    def getclass(self):
+        return self.__target
+
+
 class Select(QueryType):
     """
     Select statement which can be used to easily create a complete query
@@ -551,6 +647,7 @@ class Select(QueryType):
         self.__elements = elements
         self.__query_dict = dict()
         self.__prefix = None
+        self.fetchplan = ""
 
         if isinstance(obj, Prefixed):
             self.__clazz = obj.clazz
@@ -558,10 +655,17 @@ class Select(QueryType):
         else:
             self.__clazz = obj
 
-        self.__clazz_name = getattr(self.__clazz,'__name__')
+
+        self.__clazz_name = retrieveclassname(self.__clazz)
 
         self.__query_rule_index = ["Let", "Where", "GroupBy", "OrderBy", "Skip", "Limit", "Fetchplan", "Timeout", "Lock", "Parallel"]
         self.__props = props
+
+    @classmethod
+    def withfetchplan(cls, obj, fetchplan:str, props:list=None, *elements:QueryElement):
+        return_obj = cls(obj, props, elements)
+        return_obj.fetchplan = fetchplan
+        return return_obj
 
     def parse(self):
         try:
@@ -717,6 +821,11 @@ class Lock(QueryElement):
     def record(cls):
         return cls("record")
 
+class Skip(QueryElement):
+    def __init__(self, count:int):
+        super().__init__()
+        self._query = " skip {} ".format(count)
+
 class Limit(QueryElement):
     def __init__(self, count:int, timeout:int=None):
         super().__init__()
@@ -863,6 +972,30 @@ class Condition(WhereType):
         elif isinstance(value, int):
             return "{}".format(value)
 
+class While(QueryElement):
+    def __init__(self, *objects):
+        super().__init__()
+        self.__elements = objects
+
+    def __str__(self):
+        try:
+            query_string = io.StringIO()
+            query_string.write(" while ")
+            for element in self.__elements:
+                if isinstance(element, Select):
+                    query_string.write("(")
+                    query_string.write(element.parse())
+                    query_string.write(")")
+                else:
+                    query_string.write(str(element))
+            query_string.write(" ")
+            result_string = query_string.getvalue()
+
+            return result_string
+        except Exception as err:
+            logging.error(err)
+        finally:
+            query_string.close()
 
 class Where(QueryElement):
     def __init__(self, *objects):

@@ -43,7 +43,7 @@ class OSerializer(object):
     def encode(self, data):
         raise NotImplementedError("You have to implement the encode method")
 
-    def decode(self, data):
+    def decode(self, data, subcall:bool=False, initialpos:int=None):
         raise NotImplementedError("You have to implement the decode method")
 
     def getinstance(self, class_name):
@@ -74,6 +74,7 @@ class OSerializer(object):
         try:
             if class_name in self.entities:
                 instance = self.getinstance(class_name)
+                result_data = dict()
 
                 if isinstance(instance, BaseVertex):
                     in_edges = dict()
@@ -92,14 +93,15 @@ class OSerializer(object):
                             if hasattr(instance, field_name):
                                 setattr(instance, field_name, field_value)
                             else:
-                                raise SerializationException("instance of class '{}' has no attribute with the name '{}'".format(class_name, field_name))
+                                logging.warning("instance of class '{}' has no attribute with the name '{}', added to result dict".format(class_name, field_name))
+                                result_data[field_name] = field_value
 
                         logging.debug("parse field {} with value {}".format(field_name, field_value))
 
                     instance.in_edges = in_edges
                     instance.out_edges = out_edges
 
-                    return instance
+                    return instance, result_data
                 elif isinstance(instance, BaseEdge):
                     if isinstance(data, ORidBagBinary):
                         edge_list = list()
@@ -113,9 +115,9 @@ class OSerializer(object):
                             except StopIteration:
                                 break
                         return edge_list
-                    if isinstance(data, dict):
+                    elif isinstance(data, dict):
                         instance.tmp_rid = data
-                        return instance
+                        return instance, None
             else:
                 raise SerializationException("there is no class with name '{}'".format(class_name))
 
@@ -196,17 +198,26 @@ class OBinarySerializer(OSerializer):
 
         return result_head + result_values
 
-    def decode(self, data):
+    def decode(self, data, subcall:bool=False, initialpos:int=None):
         try:
             if len(data) != 0:
                 logging.debug("start binary deserializing bytes: {}".format(data))
+                rest = data
+                initpos = 0
+
 
                 # start deserializing
                 # first read byte
-                version, rest = self.__codec.readbyte(data)
+                if not subcall:
+                    version, rest = self.__codec.readbyte(rest)
 
                 # read class name
                 class_name, rest = self.__codec.readvarintstring(rest)
+
+                if initialpos:
+                    # initpos = initialpos + self.__codec.position
+                    initpos = self.__codec.bytecount
+
                 position_delta = 0
 
                 record = dict()
@@ -216,6 +227,8 @@ class OBinarySerializer(OSerializer):
 
                 # read fields and pointers
                 while True:
+                    logging.debug(rest)
+
                     if first_pos and self.__codec.position >= first_pos:
                         break
 
@@ -224,7 +237,9 @@ class OBinarySerializer(OSerializer):
                         break
 
                     if length > 0:
+
                         field_name, rest = self.__codec.readbytes(length, rest)
+
                         pos, rest = self.__codec.readint(rest)
                         type, rest = self.__codec.readbyte(rest)
 
@@ -232,11 +247,17 @@ class OBinarySerializer(OSerializer):
                             first_pos = pos
                             first_run = False
 
+                        if initpos != 0:
+                            pos -= initpos
+
+
                     else:
                         # TODO: Implement schema retrieval
                         # decode global property
+                        # id = (length * -1) - 1
 
                         logging.info("global property retrieval has not yet been implemented")
+                        pos = 0
                         pass
 
                     if pos != 0:
@@ -249,7 +270,11 @@ class OBinarySerializer(OSerializer):
                         self.__codec.position = actual_position
 
                         record[bytes.decode(field_name, 'utf-8')] = value
-            return record, class_name, rest[first_pos:]
+            if not subcall:
+                return record, class_name, rest[first_pos:]
+            else:
+                self.__codec.position = 0
+                return record, class_name, temp_rest
         except Exception as err:
             logging.error(err)
 
@@ -262,9 +287,9 @@ class OCSVSerializer(OSerializer):
     def encode(self, data):
         pass
 
-    def decode(self, data):
+    def decode(self, data, subcall:bool=False, initialpos:int=None):
         # decode
-        decoded_str = data.decode("utf8")
+        decoded_str = data.decode("utf-8")
         # split by @ to retrieve name of class and separated list of fields
         base_split = decoded_str.split('@')
 

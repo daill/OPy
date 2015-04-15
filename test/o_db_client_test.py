@@ -15,7 +15,8 @@
 import unittest
 from client.o_db_base import BaseVertex
 from client.o_db_set import Select, Class, Where, Condition, OrderBy, Let, QueryElement, GroupBy, Insert, Update, Set, \
-    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge, Index, Prefixed, Move, Cluster
+    Upsert, Create, Vertex, Property, Delete, And, Or, Drop, Edge, Index, Prefixed, Move, Cluster, Traverse, While, \
+    Limit
 from common.o_db_constants import OBinaryType, OSQLIndexType, OPlainClass
 from common.o_db_model import OSQLClassName
 from test.model.o_db_test_model import TestObject, TestLocation, TestCoordinates, TestEdgeOne
@@ -173,6 +174,30 @@ class ODBClientTests(unittest.TestCase):
         query = Move("#12:2", Cluster("testcluster")).parse()
         self.assertEquals(query, "move vertex #12:2 to cluster: testcluster")
 
+    def test_travers(self):
+        query = Traverse("#12:2", ['a', 'b'], ()).parse()
+        self.assertEquals(query, "traverse a, b  from #12:2 ")
+
+        query = Traverse(Class(TestLocation), ['a', 'b'], ()).parse()
+        self.assertEquals(query, "traverse a, b  from TestLocation ")
+
+        query = Traverse(Cluster("testcluster"), ['a', 'b'], ()).parse()
+        self.assertEquals(query, "traverse a, b  from testcluster ")
+
+        query = Traverse([Cluster("testcl1"), Cluster("testcl2")], ['a', 'b'], ()).parse()
+        self.assertEquals(query, "traverse a, b  from testcl1, testcl2 ")
+
+        query = Traverse(["#13:4", "#12:4"], ['a', 'b'], ()).parse()
+        self.assertEquals(query, "traverse a, b  from #13:4, #12:4 ")
+
+        query = Traverse(["#13:4", "#12:4"], ['a', 'b'], While(Condition("a").iseq("b"))).parse()
+        self.assertEquals(query, "traverse a, b  from #13:4, #12:4   while a = 'b' ")
+
+        query = Traverse(["#13:4", "#12:4"], ['a', 'b'], Where(Condition("a").iseq("b")), Limit(1)).parse()
+        self.assertEquals(query, "traverse a, b  from #13:4, #12:4   limit 1 ")
+
+        query = Traverse(Select(TestLocation, (), Where(Or(Condition("name").iseq("Eddies"),Condition("type").iseq("Pizaaria")))), ['a', 'b']).parse()
+        self.assertEquals(query, "traverse a, b  from  ( select from TestLocation  where  ( name = 'Eddies'  or type = 'Pizaaria'  )   ) ")
 
 if __name__ == "__main__":
     unittest.main()

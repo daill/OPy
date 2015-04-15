@@ -29,6 +29,7 @@ __author__ = 'daill'
 class OCodec(object):
     def __init__(self):
         self.position = 0
+        self.bytecount = 0
         self.serialization_encoder = None
         self.serialization_decoder = None
         self.toobject = None
@@ -322,8 +323,11 @@ class OCodec(object):
         if pos != 0:
             rest = data[pos:]
             self.position += len(data)-len(rest)
+            self.bytecount += len(data)-len(rest)
             return varint, rest
         else:
+            self.position += 1
+            self.bytecount += 1
             return None, data
 
     def readvarintstring(self, data):
@@ -331,36 +335,44 @@ class OCodec(object):
         if length != 0:
             value, rest = struct.unpack('>{}s'.format(length), rest[:length])[0], rest[length:]
             self.position += length
+            self.bytecount += length
             return bytes.decode(value, 'utf-8'), rest
         else:
             return None, rest
 
     def readbyte(self, data):
         self.position+=1
+        self.bytecount+=1
         return struct.unpack('>b', data[:1])[0], data[1:]
 
     def readbytes(self, length, data):
         self.position+=length
+        self.bytecount+=length
         return struct.unpack('>{}s'.format(length), data[:length])[0], data[length:]
 
     def readshort(self, data):
         self.position+=2
+        self.bytecount+=2
         return struct.unpack('>h', data[:2])[0], data[2:]
 
     def readint(self, data):
         self.position+=4
+        self.bytecount+=4
         return struct.unpack('>i', data[:4])[0], data[4:]
 
     def readlong(self, data):
         self.position+=8
+        self.bytecount+=8
         return struct.unpack('>q', data[:8])[0], data[8:]
 
     def readfloat(self, data):
         self.position+=4
+        self.bytecount+=4
         return struct.unpack('>f', data[:4])[0], data[4:]
 
     def readdouble(self, data):
         self.position+=8
+        self.bytecount+=8
         return struct.unpack('>d', data[:8])[0], data[48]
 
     def readboolean(self, data):
@@ -377,9 +389,12 @@ class OCodec(object):
         return time*milliseconds_per_day+local_timezone_offset, rest
 
     def readembedded(self, data):
-        record, class_name, rest = self.serialization_decoder(data)
-        instance = self.toobject(class_name, record)
-        return instance, rest
+        record, class_name, rest = self.serialization_decoder(data, True, self.bytecount)
+        if class_name:
+            instance = self.toobject(class_name, record)
+            return instance, rest
+        else:
+            return record, rest
 
     def readbinary(self, data):
         length, rest = self.readvarint(data)
@@ -582,7 +597,7 @@ class OCodec(object):
 
 
 
-    def readvalue(self, type, data):
+    def readvalue(self, type, data, pos:int=None):
         """
         TODO: implement RidBag
 

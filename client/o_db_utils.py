@@ -11,9 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from client.o_db_base import SystemType
 
 __author__ = 'daill'
 
 
 def escapeclassname(classname:str):
     return "{}".format(classname)
+
+def retrieveclassname(base_class):
+    """
+    This method decides whether it should use the default classname via magic member or custom method
+
+    :param base_class:
+    :return: class name for query
+    """
+    if issubclass(base_class, SystemType):
+        return base_class.getcustomclassname()
+
+    return base_class.__name__

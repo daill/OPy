@@ -40,6 +40,12 @@ class ODBSerializerTests(unittest.TestCase):
         pos, varint = OVarInteger().decode(bytes)
         self.assertEqual(value, varint)
 
+    def test_varint1(self):
+        value = 45
+        bytes = OVarInteger().encode(value)
+        pos, varint = OVarInteger().decode(bytes)
+        self.assertEqual(value, varint)
+
     def test_varint(self):
         value = 300
         bytes = OVarInteger().encode(value)
