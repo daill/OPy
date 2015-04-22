@@ -16,7 +16,7 @@ import logging
 import inspect
 import binascii
 
-from client.o_db_base import BaseVertex, BaseEdge
+from client.o_db_base import BaseVertex, BaseEdge, OSchema
 from common.o_db_exceptions import SerializationException, TypeNotFoundException
 from database.o_db_codec import OCodec
 from common.o_db_constants import ORidBagType
@@ -28,10 +28,12 @@ __author__ = 'daill'
 
 class OSerializer(object):
     entities = None
+    schema = None
 
     def __init__(self):
         self.entities = dict()
         self.createentitydict(BaseVertex)
+        self.__schema = None
 
     # build entity dict
     def createentitydict(self, base_class):
@@ -252,13 +254,48 @@ class OBinarySerializer(OSerializer):
 
 
                     else:
-                        # TODO: Implement schema retrieval
                         # decode global property
-                        # id = (length * -1) - 1
+                        id = (length * -1) - 1
 
-                        logging.info("global property retrieval has not yet been implemented")
-                        pos = 0
-                        pass
+                        logging.info("try to read global property with id '{}'".format(id))
+                        properties = self.schema.globalProperties
+
+                        def testid(id:int, prop):
+                            if 'id' in prop:
+                                if prop['id'] == id:
+                                    return True
+                            return False
+
+                        def iterateprops(id:int):
+                            for prop in properties:
+                                if testid(id, prop):
+                                    return prop
+                            return None
+
+                        try:
+                            property = properties[id]
+
+                            if testid(id, property):
+                                resultproperty = property
+                            else:
+                                # try to iterate
+                                resultproperty = iterateprops(id)
+
+                        except IndexError:
+                            logging.debug("id '{}' is out of range, try to iterate".format(id))
+
+                            resultproperty = iterateprops(id)
+                        resultproperty
+
+                        pos, rest = self.__codec.readint(rest)
+
+                        type = resultproperty['type']
+                        field_name = resultproperty['name']
+
+                        logging.info("property with id '{}' found".format(id))
+
+                        if initpos != 0:
+                            pos -= initpos
 
                     if pos != 0:
                         actual_position = self.__codec.position
@@ -269,7 +306,11 @@ class OBinarySerializer(OSerializer):
 
                         self.__codec.position = actual_position
 
-                        record[bytes.decode(field_name, 'utf-8')] = value
+                        # if we've read a property the field name is type of string
+                        if isinstance(field_name, bytes):
+                            record[bytes.decode(field_name, 'utf-8')] = value
+                        else:
+                            record[field_name] = value
             if not subcall:
                 return record, class_name, rest[first_pos:]
             else:

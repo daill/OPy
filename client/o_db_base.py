@@ -69,10 +69,10 @@ class BaseVertex(BaseEntity):
         for edge_list in self.__out_edges.values():
             for obj in edge_list:
                 if isinstance(obj, BaseEdge):
-                    obj.in_vertex = self
+                    obj.out_vertex = self
                 elif isinstance(obj, list):
                     for edge in obj:
-                        edge.in_vertex = self
+                        edge.out_vertex = self
 
 
         return self.__out_edges
@@ -87,12 +87,12 @@ class BaseVertex(BaseEntity):
         for edge_list in self.__in_edges.values():
             for obj in edge_list:
                 if isinstance(obj, BaseEdge):
-                    obj.out_vertex = self
+                    obj.in_vertex = self
                 elif isinstance(obj, list):
                     for edge in obj:
-                        edge.out_vertex = self
+                        edge.in_vertex = self
 
-        return self.__out_edges
+        return self.__in_edges
 
     out_edges = property(getoutedges, setoutedges)
     in_edges = property(getinedges, setinedges)
@@ -124,7 +124,7 @@ class SystemType(object):
     def getcustomclassname(cls):
         raise NotImplementedError("You have to implement this method")
 
-class GlobalProperties(BaseVertex, SystemType):
+class OSchema(BaseVertex, SystemType):
     """
     Class to represent the global properties
     """

@@ -605,7 +605,13 @@ class OCodec(object):
         :param data:
         :return:
         """
-        otype = OBinaryType(type)
+        if isinstance(type, OBinaryType):
+            otype = type
+        elif isinstance(type, str):
+            otype = OBinaryType[type]
+        else:
+            otype = OBinaryType(type)
+
 
         if otype == OBinaryType.BOOLEAN:
             return self.readbyte(data)

@@ -14,7 +14,7 @@
 from lib2to3.pytree import Base
 
 import logging
-from client.o_db_base import BaseVertex, BaseEdge, BaseEntity, SystemType
+from client.o_db_base import BaseVertex, BaseEdge, BaseEntity, SystemType, OSchema
 from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, GraphType, Vertices, \
     Edges, Property, Delete, Index, Cluster, Move, Traverse
 from common.o_db_exceptions import OPyClientException, SerializationException
@@ -32,6 +32,7 @@ class OClient(object):
     # defines the base class
     baseclass = BaseEntity
     entities = dict()
+    schema = None
 
     """
     This object has to be implemented by all object which should be auto saved and unfolded.
@@ -52,6 +53,7 @@ class OClient(object):
             # open the given database
             self.__odb.dbopen(self.__connection, database_name=database, database_type=ODBType.GRAPH.value, user_name="root", user_password="root")
 
+
         except Exception as err:
             logging.error(err)
             raise OPyClientException(err)
@@ -61,6 +63,9 @@ class OClient(object):
 
         # trigger dict creation process
         self.createentitydict(OClient.baseclass)
+
+        #read schema
+        self.readschema()
 
         pass
 
@@ -532,6 +537,7 @@ class OClient(object):
             else:
                 serializer = OBinarySerializer()
             serializer.entities = self.entities
+            serializer.schema = self.schema
 
             # get the deserialized data
             data, class_name, rest = serializer.decode(record_content)
@@ -560,9 +566,23 @@ class OClient(object):
 
         return base_class.__name__
 
+    def readschema(self, force:bool=False):
 
-    # build entity dict
+        try:
+            if not OClient.schema or force:
+                result = self.fetch(Select(OSchema, ['globalProperties'],()))
+            OClient.schema = result['#-2:0']
+        except Exception as err:
+            logging.error(err)
+
+
+
     def createentitydict(self, base_class):
+        """
+        Create dictionary of domain classes used in the database
+        :param base_class:
+        :return:
+        """
         subclasses = base_class.__subclasses__()
         for clazz in subclasses:
             OClient.entities[self.retrieveclassname(clazz)] = clazz.__module__
