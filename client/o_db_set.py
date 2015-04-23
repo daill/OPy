@@ -541,6 +541,37 @@ class Insert(QueryType):
         finally:
             query_string.close()
 
+class Truncate(QueryType):
+    """
+
+    """
+    def __init__(self, target):
+        super().__init__()
+        self.__target = target
+
+    def parse(self):
+        try:
+            query_string = io.StringIO()
+            query_string.write("truncate class ")
+
+            if isinstance(self.__target, Class):
+                query_string.write(self.__target.classname())
+
+            result_string = query_string.getvalue()
+
+            logging.debug("parsed sql string: '{}'".format(result_string))
+
+            return result_string
+
+        except Exception as err:
+            logging.error(err)
+        finally:
+            query_string.close()
+
+    def getclass(self):
+        return self.__target
+
+
 class Traverse(QueryType):
     """
     TRAVERSE <[class.]field>|*|any()|all()
@@ -649,12 +680,14 @@ class Select(QueryType):
         self.__prefix = None
         self.fetchplan = ""
 
-        if isinstance(obj, Prefixed):
-            self.__clazz = obj.clazz
-            self.__prefix = obj.prefix
+        if obj:
+            if isinstance(obj, Prefixed):
+                self.__clazz = obj.clazz
+                self.__prefix = obj.prefix
+            else:
+                self.__clazz = obj
         else:
-            self.__clazz = obj
-
+            self.__clazz = None
 
         self.__clazz_name = retrieveclassname(self.__clazz)
 
@@ -679,11 +712,12 @@ class Select(QueryType):
                         query_string.write(", ")
                 query_string.write(" ")
 
-            query_string.write("from ")
-            query_string.write(escapeclassname(self.__clazz_name))
-            if self.__prefix:
-                query_string.write(" ")
-                query_string.write(self.__prefix)
+            if self.__clazz:
+                query_string.write("from ")
+                query_string.write(escapeclassname(self.__clazz_name))
+                if self.__prefix:
+                    query_string.write(" ")
+                    query_string.write(self.__prefix)
 
             for element in self.__elements:
                 self.__query_dict[element.__class__.__name__] = str(element)

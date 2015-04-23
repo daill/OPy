@@ -26,7 +26,9 @@ def retrieveclassname(base_class):
     :param base_class:
     :return: class name for query
     """
-    if issubclass(base_class, SystemType):
-        return base_class.getcustomclassname()
+    if base_class:
+        if issubclass(base_class, SystemType):
+            return base_class.getcustomclassname()
 
-    return base_class.__name__
+        return base_class.__name__
+    return None

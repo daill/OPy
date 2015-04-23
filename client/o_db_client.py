@@ -16,7 +16,7 @@ from lib2to3.pytree import Base
 import logging
 from client.o_db_base import BaseVertex, BaseEdge, BaseEntity, SystemType, OSchema
 from client.o_db_set import Select, Class, QueryType, Vertex, Edge, Update, Insert, Create, Drop, GraphType, Vertices, \
-    Edges, Property, Delete, Index, Cluster, Move, Traverse
+    Edges, Property, Delete, Index, Cluster, Move, Traverse, Truncate
 from common.o_db_exceptions import OPyClientException, SerializationException
 from database.o_db_connection import OConnection
 from common.o_db_constants import ODBType, OModeChar, OCommandClass, OSerialization
@@ -225,6 +225,16 @@ class OClient(object):
         except Exception as err:
             logging.error(err)
 
+    def truncate(self, query_type:QueryType):
+        try:
+            query_string = query_type.parse()
+
+            # fetchplan is only needed on select query
+            command = OSQLCommand(query_string, non_text_limit=-1, fetchplan='', serialized_params="")
+            return self.__odb.command(self.__connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command)
+        except Exception as err:
+            logging.error(err)
+
     def drop(self, query_type:GraphType):
         try:
             query_string = query_type.parse()
@@ -257,6 +267,8 @@ class OClient(object):
             return self.update(query_action)
         elif isinstance(query_action, Delete):
             return self.delete(query_action)
+        elif isinstance(query_action, Truncate):
+            return self.truncate(query_action)
         elif isinstance(query_action, Drop):
             return self.drop(query_action)
         elif isinstance(query_action, Move):
@@ -442,13 +454,18 @@ class OClient(object):
 
                                                     parsedobject, resultdata = self.parseobject(record_content=record.get("record-content"), clazz=clazz)
 
-                                                    parsedobject.setRID(clusterid, clusterposition)
-                                                    parsedobject.version = version
 
-                                                    # if isinstance(parsedobject, clazz):
-                                                    #     returningobject[parsedobject.getRID()] = parsedobject
+                                                    if not isinstance(parsedobject, dict):
+                                                        parsedobject.setRID(clusterid, clusterposition)
+                                                        parsedobject.version = version
 
-                                                    fetchedobjects[parsedobject.getRID()] = parsedobject
+                                                        # if isinstance(parsedobject, clazz):
+                                                        #     returningobject[parsedobject.getRID()] = parsedobject
+
+                                                        fetchedobjects[parsedobject.getRID()] = parsedobject
+                                                    else:
+                                                        rid = "#{}:{}".format(clusterid, clusterposition)
+                                                        fetchedobjects[rid] = parsedobject
 
                                                     logging.debug("clusterid '{}' clusterposition '{}'  version '{}'  content '{}'".format(clusterid, clusterposition, version, record.get("record-content")))
 
@@ -549,6 +566,7 @@ class OClient(object):
                 parsedobject, result_data = serializer.toobject(class_name, data)
             else:
                 parsedobject = data
+                result_data = rest
 
             return parsedobject, result_data
         else:
@@ -561,10 +579,12 @@ class OClient(object):
         :param base_class:
         :return: class name for query
         """
-        if isinstance(base_class, SystemType):
-            return base_class.getcustomclassname()
+        if base_class:
+            if isinstance(base_class, SystemType):
+                return base_class.getcustomclassname()
+            return base_class.__name__
+        return None
 
-        return base_class.__name__
 
     def readschema(self, force:bool=False):
 
