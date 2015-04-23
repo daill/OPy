@@ -1,4 +1,31 @@
-<a name="0.1"></a>
+
+# Changelog
+
+# v0.5
+
+## Commit overview
+
+<ul>
+<li> <a href="http://github.com/daill/OPy/commit/3025efb28aa69ad340be05a3a8f3a80eb52821fe">view commit &bull;</a> updates readme</li> 
+<li> <a href="http://github.com/daill/OPy/commit/24e8c30f239b3f365c94dd01cb66fdf9c813f592">view commit &bull;</a> adds truncate adds possibility to retrieve raw data parsed in dict</li> 
+<li> <a href="http://github.com/daill/OPy/commit/5f198aa7bea1971f35d4ca387317b7da6531392a">view commit &bull;</a> completes the traverse command fixes wrong edge handling within vertex</li> 
+<li> <a href="http://github.com/daill/OPy/commit/fb64f52042ecafa89e68e54d5cc8408d55684f5c">view commit &bull;</a> Adds loading of metadata:schema Adds new class for systemtypes</li> 
+<li> <a href="http://github.com/daill/OPy/commit/a1a1e65b95276b8ebce4768cb70c3cf5e2bfedf0">view commit &bull;</a> adds move and some tests fixes several small hiccups</li> 
+<li> <a href="http://github.com/daill/OPy/commit/7024bba9860834d050e71231a389fd417c18ccdf">view commit &bull;</a> renames persistent_attributes to persistentattributes</li>
+</ul>
+
+# v0.3
+
+## Commit overview
+
+<ul>
+<li> <a href="http://github.com/daill/OPy/commit/c00f29c597b19963e5b25086bace52395e6dc693">view commit &bull;</a> adds more functionality to query language</li> 
+<li> <a href="http://github.com/daill/OPy/commit/2d903ef1e8313cfa66228701d92242f55e6114cf">view commit &bull;</a> further steps to the final query language</li> 
+<li> <a href="http://github.com/daill/OPy/commit/a7758003b0d5f2396ac5833cde59059a0348797e">view commit &bull;</a> adds the possibility to create a list of vertices and edges</li> 
+<li> <a href="http://github.com/daill/OPy/commit/10c51c001faddc3228b79e26b513626fe9842e72">view commit &bull;</a> fixed object retrieving</li> 
+<li> <a href="http://github.com/daill/OPy/commit/98bd233c03d8d3b168e89848dbe969b3c4e22de0">view commit &bull;</a> updates *.md files</li> 
+</ul>
+
 # v0.2
 
 ## Commit overview
