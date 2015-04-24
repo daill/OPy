@@ -257,7 +257,7 @@ class OBinarySerializer(OSerializer):
                         # decode global property
                         id = (length * -1) - 1
 
-                        logging.info("try to read global property with id '{}'".format(id))
+                        logging.debug("try to read global property with id '{}'".format(id))
                         properties = self.schema.globalProperties
 
                         def testid(id:int, prop):
@@ -292,7 +292,7 @@ class OBinarySerializer(OSerializer):
                         type = resultproperty['type']
                         field_name = resultproperty['name']
 
-                        logging.info("property with id '{}' found".format(id))
+                        logging.debug("property with id '{}' found".format(id))
 
                         if initpos != 0:
                             pos -= initpos

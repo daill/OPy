@@ -23,4 +23,4 @@ frm = logging.Formatter("%(asctime)s %(filename)s line: %(lineno)d %(levelname)s
 handler.setFormatter(frm)
 logger = logging.getLogger()
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
