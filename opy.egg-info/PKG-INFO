@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: opy
+Version: 0.5.1
+Summary: Native binary OrientDB driver.
+Home-page: https://github.com/daill/OPy
+Author: Christian Kramer
+Author-email: ck.daill@gmail.com
+License: LICENSE.txt
+Description: UNKNOWN
+Platform: UNKNOWN
