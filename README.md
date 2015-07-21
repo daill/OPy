@@ -1,6 +1,6 @@
 # OPy
 
-This is an alternative Python 3 OrientDB driver implementation based on the latest release of OrientDB. Currently its supporting binary protocol version 28 of OrientDB version 2.0. It's still under development and written with the aim to provide an object mapping for the graph database part of OrientDB. More information about the usage will follow as soon as possible.
+This is an alternative Python 3 OrientDB driver implementation based on the latest release of OrientDB. Currently its supporting binary protocol version 31 of OrientDB version 2.1-rc5. It's still under development and written with the aim to provide an object mapping for the graph database part of OrientDB. More information about the usage will follow as soon as possible.
 
 ## Structure
 This lib splits into two parts:
@@ -244,17 +244,19 @@ On serializing a list auf records you have to make sure, that these records have
 * REQUEST\_TX_COMMIT
 * REQUEST\_DB_RELOAD
 
-## Not implemented
+## Not yet implemented
 
+* REQUEST\_INDEX_GET
+* REQUEST\_INDEX_PUT
+* REQUEST\_INDEX_REMOVE
+* REQUEST\_RECORD_LOAD_IF_VERSION_NOT_LATEST
 * REQUEST\_DATACLUSTER_ADD
 * REQUEST\_DATACLUSTER_DROP	
 * REQUEST\_DATACLUSTER_COUNT
 * REQUEST\_DATACLUSTER_DATARANGE
-
-# Query language
-
-### Update
 |[CONTENT|MERGE <JSON>] not implemented
+
+
 
 
 
