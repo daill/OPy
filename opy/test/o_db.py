@@ -55,7 +55,7 @@ def do():
     content1 = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Barack",surname:"Obama",location:#3:2,invitedBy:,salary_cloned:,salary:120.3f'
     content2 = 'Profile@nick:"ThePresident",follows:[],followers:[#10:5,#10:6],name:"Angela",surname:"Merkel",location:#3:2,invitedBy:,salary_cloned:,salary:192.0f'
     # print(odb.record_create(connection, mode=OModeInt.SYNCHRONOUS.value, record_content=content, record_type=ORecordType.DOCUMENT.value))
-    print(odb.recordload(connection, cluster_id=12, cluster_position=1, fetch_plan="", ignore_cache=1, load_tombstones=' '))
+    # print(odb.recordload(connection, cluster_id=12, cluster_position=1, fetch_plan="", ignore_cache=1, load_tombstones=' '))
     # print(odb.record_delete(connection, cluster_id=13, cluster_position=11, record_version=2, mode=OModeInt.SYNCHRONOUS.value))
     # command = OSQLCommand("create vertex Person set name = 'Luca1'", non_text_limit=-1, fetchplan="*:0", serialized_params="")
     # print(odb.command(connection, mode=OModeChar.SYNCHRONOUS, class_name=OCommandClass.NON_IDEMPOTENT, command_payload=command))

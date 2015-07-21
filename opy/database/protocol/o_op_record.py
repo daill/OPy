@@ -150,7 +150,7 @@ class OOperationRecordCreate(OOperation):
         # datasegment id removed since 2.0
         # self.__request_profile_str = "(datasegment-id:int)(cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)"
         self.__request_profile_str = "(cluster-id:short)(record-content:bytes)(record-type:byte)(mode:byte)"
-        self.__response_profile_str = "(cluster-position:long)(record-version:int)(count-of-collection-changes:int)[{update-info}(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)(updated-page-index:long)(updated-page-offset:int)]"
+        self.__response_profile_str = "(cluster-id:short)(cluster-position:long)(record-version:int)(count-of-collection-changes:int)[{update-info}(uuid-most-sig-bits:long)(uuid-least-sig-bits:long)(updated-file-id:long)(updated-page-index:long)(updated-page-offset:int)]*"
 
         self.__request_profile = None
         self.__response_profile = None
@@ -250,7 +250,7 @@ class OOperationRecordLoad(OOperation):
         super().__init__(OOperationType.REQUEST_RECORD_LOAD)
 
         self.__request_profile_str = "(cluster-id:short)(cluster-position:long)(fetch-plan:string)(ignore-cache:byte)(load-tombstones:byte)"
-        self.__response_profile_str = "[{payload}(payload-status:byte)[{records}(record-content:bytes)(record-version:int)(record-type:byte)]*]+"
+        self.__response_profile_str = "[{payload}(payload-status:byte)[{records}(record-type:byte)(record-version:int)(record-content:bytes)]*]+"
 
         self.__request_profile = None
         self.__response_profile = None
